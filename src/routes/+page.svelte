@@ -1,45 +1,46 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { publicClient } from '$lib/viem';
 	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError } from '$lib/viem';
-
-	let blockNumber: bigint | null = null;
-
-	onMount(async () => {
-		blockNumber = await publicClient.getBlockNumber();
-	});
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<h1 class="text-3xl font-bold">SNT Staking Demo App</h1>
-	<div class="mt-4 space-y-2">
-		{#if blockNumber}
-			<p class="text-gray-700">Current Block Number: {blockNumber.toString()}</p>
-		{:else}
-			<p class="text-gray-500">Loading block number...</p>
-		{/if}
-
-		{#if $walletAddress}
-			<div class="mt-6 space-y-3">
-				<div class="flex items-center gap-2">
-					<span class="text-gray-700">Testnet ETH Balance:</span>
-					<span class="px-3 py-1 text-sm font-medium text-emerald-700 bg-emerald-100 rounded-lg">
-						{$formattedBalance ?? '0.0000'} {network.currency}
-					</span>
+<div class="mx-auto max-w-7xl px-6 lg:px-8">
+	{#if $walletAddress}
+		<div class="mx-auto mt-8 max-w-2xl">
+			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Available Balance</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								{$formattedBalance ?? '0.0000'}
+							</span>
+							<span class="text-sm font-semibold leading-6 text-gray-500">{network.currency}</span>
+						</div>
+					</div>
 				</div>
-				<div class="flex items-center gap-2">
-					<span class="text-gray-700">Testnet SNT Balance:</span>
-					{#if $sntError}
-						<span class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded-lg">
-							Error: {$sntError}
-						</span>
-					{:else}
-						<span class="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded-lg">
-							{$formattedSntBalance ?? '0.0000'} {SNT_TOKEN.symbol}
-						</span>
-					{/if}
+
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">SNT Balance</h3>
+						{#if $sntError}
+							<div class="mt-4 text-sm font-medium text-red-600 text-right">Error: {$sntError}</div>
+						{:else}
+							<div class="mt-4 flex items-baseline justify-end gap-x-2">
+								<span class="text-4xl font-bold tracking-tight text-gray-900">
+									{$formattedSntBalance ?? '0.0000'}
+								</span>
+								<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
-		{/if}
-	</div>
+		</div>
+	{:else}
+		<div class="mx-auto mt-16 max-w-2xl text-center">
+			<div class="rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5">
+				<h3 class="text-sm font-semibold leading-7 text-gray-900">Connect Wallet</h3>
+				<p class="mt-2 text-sm leading-6 text-gray-500">Connect your wallet to view your balances</p>
+			</div>
+		</div>
+	{/if}
 </div>
