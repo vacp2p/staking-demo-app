@@ -1,15 +1,28 @@
 <script lang="ts">
-	import { walletAddress, formattedSntBalance, SNT_TOKEN } from '$lib/viem';
+	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient } from '$lib/viem';
+	import { decodeEventLog } from 'viem';
+	import TransactionModal from '$lib/components/TransactionModal.svelte';
+	import type { Address, Log } from 'viem';
 
 	let amount = '';
-	let isCreatingNewVault = true;
 	let selectedVaultId = '';
+	let isDeploying = false;
+	let deployError: string | undefined;
+
+	// Transaction modal state
+	let isModalOpen = false;
+	let txHash: string | undefined;
+	let deployedVaultAddress: Address | undefined;
+
+	function shortenAddress(address: string): string {
+		return `${address.slice(0, 6)}...${address.slice(-4)}`;
+	}
 
 	// Dummy data for demonstration
 	const existingVaults = [
-		{ id: 1, staked: '2000' },
-		{ id: 2, staked: '1500' },
-		{ id: 3, staked: '1500' }
+		{ id: 1, staked: '2,000' },
+		{ id: 2, staked: '1,500' },
+		{ id: 3, staked: '1,500' }
 	];
 
 	const stakingInfo = {
@@ -21,45 +34,158 @@
 	function handleStake() {
 		alert('Staking functionality will be implemented later');
 		amount = '';
-		isCreatingNewVault = true;
 		selectedVaultId = '';
+	}
+
+	async function handleDeployVault() {
+		if (isDeploying) return;
+		
+		try {
+			isDeploying = true;
+			deployError = undefined;
+			isModalOpen = true;
+			
+			// First get the transaction hash
+			const { hash } = await deployVault();
+			txHash = hash;
+
+			// Wait for transaction confirmation and get the receipt
+			const receipt = await publicClient.waitForTransactionReceipt({ 
+				hash,
+				confirmations: 1 // Wait for at least 1 confirmation
+			});
+
+			// Find the VaultCreated event
+			const vaultCreatedLog = receipt.logs.find((log) => {
+				// First check if this log is from our contract
+				if (log.address.toLowerCase() !== VAULT_FACTORY.address.toLowerCase()) {
+					return false;
+				}
+
+				// Check if this is the VaultCreated event signature
+				// This is the actual signature from the contract
+				return log.topics[0] === '0x5d9c31ffa0fecffd7cf379989a3c7af252f0335e0d2a1320b55245912c781f53';
+			});
+
+			if (!vaultCreatedLog || !vaultCreatedLog.topics[1]) {
+				console.log('Receipt logs:', receipt.logs);
+				throw new Error('VaultCreated event not found in transaction logs');
+			}
+
+			// The vault address is the first indexed parameter
+			// Remove the padding from the address (first 24 bytes)
+			const paddedAddress = vaultCreatedLog.topics[1] as `0x${string}`;
+			deployedVaultAddress = `0x${paddedAddress.slice(26)}` as Address;
+			console.log('Deployed vault address:', deployedVaultAddress);
+			
+		} catch (error) {
+			console.error('Failed to deploy vault:', error);
+			deployError = error instanceof Error ? error.message : 'Failed to deploy vault';
+		} finally {
+			isDeploying = false;
+		}
+	}
+
+	function handleCloseModal() {
+		isModalOpen = false;
+		txHash = undefined;
+		deployedVaultAddress = undefined;
 	}
 </script>
 
 <div class="mx-auto max-w-2xl px-6 lg:px-8">
 	{#if $walletAddress}
-		<div class="mx-auto mt-8">
-			<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+		<div class="mx-auto mt-8 space-y-6">
+			<!-- Combined Balance and Deploy Box -->
+			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+				<!-- SNT Balance Box -->
+				<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+					<div class="p-8">
+						<div class="flex flex-col">
+							<h2 class="text-base font-semibold leading-7 text-gray-900">Available SNT to Stake</h2>
+							<div class="mt-4 flex items-baseline gap-x-2">
+								<span class="text-4xl font-bold tracking-tight text-gray-900">
+									{$formattedSntBalance ?? '0'}
+								</span>
+								<span class="text-lg font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Deploy Vault Box -->
+				<div class="relative overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+					<div class="p-8">
+						<div class="flex flex-col">
+							<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
+							<div class="mt-4 flex items-baseline gap-x-2">
+								<span class="text-4xl font-bold tracking-tight text-gray-900">
+									{$userVaults.length}
+								</span>
+								<span class="text-lg font-semibold leading-6 text-gray-500">vaults</span>
+							</div>
+							{#if deployError}
+								<p class="mt-2 text-sm text-red-600">{deployError}</p>
+							{/if}
+						</div>
+					</div>
+					<!-- Floating Action Button with Tooltip -->
+					<div class="group absolute bottom-4 right-4">
+						<button
+							on:click={handleDeployVault}
+							class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+							disabled={isDeploying}
+						>
+							{#if isDeploying}
+								<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+							{:else}
+								<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+								</svg>
+							{/if}
+						</button>
+						<div class="absolute bottom-full right-0 mb-2 hidden group-hover:block">
+							<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
+								Deploy a New Vault
+							</div>
+							<div class="absolute -bottom-1 right-4 h-2 w-2 rotate-45 bg-gray-900"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Staking Form Box -->
+			<div class="relative overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+				{#if $userVaults.length === 0}
+					<div class="absolute inset-0 z-10 flex items-center justify-center bg-white/95">
+						<div class="max-w-sm text-center">
+							<p class="text-sm font-medium text-gray-900">
+								You need to have an empty or unlocked staking vault to stake
+							</p>
+							<button
+								type="button"
+								class="mt-1 text-sm text-blue-600 hover:text-blue-700"
+								on:click={handleDeployVault}
+							>
+								Create a new vault to start staking your SNT tokens
+							</button>
+						</div>
+					</div>
+				{/if}
 				<div class="p-8">
 					<h2 class="text-base font-semibold leading-7 text-gray-900">Stake SNT</h2>
-					<p class="mt-1 text-sm leading-6 text-gray-500">
-						Stake your SNT tokens to earn rewards. Minimum stake amount is {stakingInfo.minStake} {SNT_TOKEN.symbol}.
-					</p>
+					<div class="{$userVaults.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
+						<p class="mt-1 text-sm leading-6 text-gray-500">
+							Stake your SNT tokens to earn rewards. Minimum stake amount is {stakingInfo.minStake} {SNT_TOKEN.symbol}.
+						</p>
 
-					<div class="mt-6 flex items-center gap-x-3">
-						<button
-							class="rounded-lg px-3 py-2 text-sm font-semibold {isCreatingNewVault
-								? 'bg-blue-100 text-blue-700'
-								: 'text-gray-700 hover:bg-gray-50'}"
-							on:click={() => (isCreatingNewVault = true)}
+						<form
+							class="mt-6"
+							on:submit|preventDefault={handleStake}
 						>
-							New Vault
-						</button>
-						<button
-							class="rounded-lg px-3 py-2 text-sm font-semibold {!isCreatingNewVault
-								? 'bg-blue-100 text-blue-700'
-								: 'text-gray-700 hover:bg-gray-50'}"
-							on:click={() => (isCreatingNewVault = false)}
-						>
-							Existing Vault
-						</button>
-					</div>
-
-					<form
-						class="mt-6"
-						on:submit|preventDefault={handleStake}
-					>
-						{#if !isCreatingNewVault}
 							<div class="space-y-2">
 								<label
 									for="vault"
@@ -74,54 +200,54 @@
 									required
 								>
 									<option value="">Select a vault</option>
-									{#each existingVaults as vault}
-										<option value={vault.id}>
-											Vault #{vault.id} - Current stake: {vault.staked} {SNT_TOKEN.symbol}
+									{#each $userVaults as vault, i}
+										<option value={vault}>
+											Vault #{i + 1} - {shortenAddress(vault)}
 										</option>
 									{/each}
 								</select>
 							</div>
-						{/if}
 
-						<div class="mt-4 space-y-2">
-							<label
-								for="amount"
-								class="block text-sm font-medium leading-6 text-gray-900"
-							>
-								Amount to Stake
-							</label>
-							<div class="relative">
-								<input
-									type="text"
-									id="amount"
-									bind:value={amount}
-									placeholder="0.0000"
-									class="block w-full rounded-lg border-0 py-2 pr-16 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
-									required
-								/>
-								<div class="absolute inset-y-0 right-0 flex items-center pr-3">
-									<span class="text-sm text-gray-500">{SNT_TOKEN.symbol}</span>
+							<div class="mt-4 space-y-2">
+								<label
+									for="amount"
+									class="block text-sm font-medium leading-6 text-gray-900"
+								>
+									Amount to Stake
+								</label>
+								<div class="relative">
+									<input
+										type="text"
+										id="amount"
+										bind:value={amount}
+										placeholder="0"
+										class="block w-full rounded-lg border-0 py-2 pr-16 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+										required
+									/>
+									<div class="absolute inset-y-0 right-0 flex items-center pr-3">
+										<span class="text-sm text-gray-500">{SNT_TOKEN.symbol}</span>
+									</div>
 								</div>
+								<p class="text-sm text-gray-500">
+									Available: {$formattedSntBalance ?? '0'} {SNT_TOKEN.symbol}
+								</p>
 							</div>
-							<p class="text-sm text-gray-500">
-								Available: {$formattedSntBalance ?? '0.0000'} {SNT_TOKEN.symbol}
-							</p>
-						</div>
 
-						<div class="mt-6 flex items-center justify-between text-sm">
-							<span class="text-gray-500">Current APR</span>
-							<span class="font-medium text-gray-900">{stakingInfo.apr}%</span>
-						</div>
+							<div class="mt-6 flex items-center justify-between text-sm">
+								<span class="text-gray-500">Current APR</span>
+								<span class="font-medium text-gray-900">{stakingInfo.apr}%</span>
+							</div>
 
-						<div class="mt-6">
-							<button
-								type="submit"
-								class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-							>
-								Stake SNT
-							</button>
-						</div>
-					</form>
+							<div class="mt-6">
+								<button
+									type="submit"
+									class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+								>
+									Stake SNT
+								</button>
+							</div>
+						</form>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -133,4 +259,13 @@
 			</div>
 		</div>
 	{/if}
-</div> 
+</div>
+
+<TransactionModal
+	isOpen={isModalOpen}
+	onClose={handleCloseModal}
+	txHash={txHash}
+	vaultAddress={deployedVaultAddress}
+	isDeploying={isDeploying}
+	isDeployed={!isDeploying && txHash !== undefined}
+/> 

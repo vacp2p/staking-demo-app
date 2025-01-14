@@ -1,59 +1,97 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedTotalStaked, vaultStakedAmounts } from '$lib/viem';
+	import { goto } from '$app/navigation';
+	import { formatUnits } from 'viem';
+
+	const SNT_USD_RATE = 0.04298;
 
 	// Dummy data for demonstration
 	const stakingStats = {
-		totalStaked: '150000',
-		totalRewards: '2500',
-		activeVaults: 3,
-		averageAPR: '12.5'
+		totalStaked: '150,000',
+		totalRewards: '2,500',
+		averageAPR: '12.5',
+		globalStats: {
+			totalSntStaked: '2,000,000',
+			get totalValueUsd() {
+				return Math.floor(Number(this.totalSntStaked.replace(/,/g, '')) * SNT_USD_RATE).toLocaleString()
+			}
+		}
 	};
 
 	const userStats = {
-		totalStaked: '5000',
+		totalStaked: '5,000',
 		availableRewards: '125',
 		vaults: [
-			{ id: 1, staked: '2000', rewards: '50', apr: '12.5' },
-			{ id: 2, staked: '1500', rewards: '37', apr: '12.5' },
-			{ id: 3, staked: '1500', rewards: '37', apr: '12.5' }
+			{ id: 1, staked: '2,000', rewards: '50', apr: '12.5' },
+			{ id: 2, staked: '1,500', rewards: '37', apr: '12.5' },
+			{ id: 3, staked: '1,500', rewards: '37', apr: '12.5' }
 		]
 	};
+
+	function handleStartStaking() {
+		goto('/stake');
+	}
+
+	function shortenAddress(address: string): string {
+		return `${address.slice(0, 6)}...${address.slice(-4)}`;
+	}
+
+	function openEtherscan(address: string) {
+		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+	}
+
+	function formatAmount(amount: bigint): string {
+		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(4);
+	}
 </script>
 
 <div class="mx-auto max-w-7xl px-6 lg:px-8">
 	{#if $walletAddress}
 		<div class="mx-auto mt-8 max-w-4xl">
+			<!-- First row -->
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Your Total Staked</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{userStats.totalStaked}
-							</span>
-							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+				{#if $userVaults.length > 0}
+					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+						<div class="flex flex-col">
+							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Total Staked</h3>
+							<div class="mt-4 flex items-baseline justify-end gap-x-2">
+								<span class="text-4xl font-bold tracking-tight text-gray-900">
+									{$formattedTotalStaked}
+								</span>
+								<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+							</div>
 						</div>
 					</div>
-				</div>
 
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Available Rewards</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{userStats.availableRewards}
-							</span>
-							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+						<div class="flex flex-col">
+							<h3 class="text-sm font-medium leading-6 text-gray-500">Available Rewards</h3>
+							<div class="mt-4 flex items-baseline justify-end gap-x-2">
+								<span class="text-4xl font-bold tracking-tight text-gray-900">
+									{userStats.availableRewards}
+								</span>
+								<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+							</div>
 						</div>
 					</div>
-				</div>
+				{:else}
+					<div class="col-span-2 overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm ring-1 ring-blue-900/5">
+						<button
+							class="flex h-full w-full flex-col items-center justify-center gap-2"
+							on:click={handleStartStaking}
+						>
+							<h3 class="text-lg font-semibold text-blue-900">Start Earning Rewards</h3>
+							<p class="text-sm text-blue-700">Deploy your first staking vault to start earning rewards</p>
+						</button>
+					</div>
+				{/if}
 
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 					<div class="flex flex-col">
 						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{userStats.vaults.length}
+								{$userVaults.length}
 							</span>
 						</div>
 					</div>
@@ -72,59 +110,106 @@
 				</div>
 			</div>
 
-			<div class="mt-8">
-				<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
-
-				<!-- Table view (desktop) -->
-				<div class="mt-4 hidden sm:block">
-					<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
-						<table class="min-w-full divide-y divide-gray-300">
-							<thead>
-								<tr>
-									<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Vault ID</th>
-									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Staked Amount</th>
-									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Available Rewards</th>
-									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">APR</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-gray-200">
-								{#each userStats.vaults as vault}
-									<tr>
-										<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">#{vault.id}</td>
-										<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">{vault.staked} {SNT_TOKEN.symbol}</td>
-										<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">{vault.rewards} {SNT_TOKEN.symbol}</td>
-										<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">{vault.apr}%</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+			<!-- Second row -->
+			<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Total SNT Staked</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								{stakingStats.globalStats.totalSntStaked}
+							</span>
+							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+						</div>
 					</div>
 				</div>
 
-				<!-- Card view (mobile) -->
-				<div class="mt-4 space-y-4 sm:hidden">
-					{#each userStats.vaults as vault}
-						<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-900/5">
-							<div class="px-4 py-5">
-								<div class="flex items-center justify-between">
-									<h3 class="text-sm font-medium text-gray-900">Vault #{vault.id}</h3>
-									<span class="text-sm font-medium text-gray-900">{vault.apr}% APR</span>
-								</div>
-								<div class="mt-4 space-y-3">
-									<div class="flex justify-between">
-										<span class="text-sm text-gray-500">Staked Amount</span>
-										<span class="text-sm font-medium text-gray-900">{vault.staked} {SNT_TOKEN.symbol}</span>
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Total Value Staked</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								${stakingStats.globalStats.totalValueUsd}
+							</span>
+							<span class="text-sm font-semibold leading-6 text-gray-500">USD</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{#if $userVaults.length > 0}
+				<div class="mt-8">
+					<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
+
+					<!-- Table view (desktop) -->
+					<div class="mt-4 hidden sm:block">
+						<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+							<table class="min-w-full divide-y divide-gray-300">
+								<thead>
+									<tr>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Vault ID</th>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Staked Amount</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Available Rewards</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">APR</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y divide-gray-200">
+									{#each $userVaults as vault, i}
+										<tr>
+											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">#{i + 1}</td>
+											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+												<button
+													class="text-blue-600 hover:text-blue-900"
+													on:click={() => openEtherscan(vault)}
+												>
+													{shortenAddress(vault)}
+												</button>
+											</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					</div>
+
+					<!-- Card view (mobile) -->
+					<div class="mt-4 space-y-4 sm:hidden">
+						{#each $userVaults as vault, i}
+							<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-900/5">
+								<div class="px-4 py-5">
+									<div class="flex items-center justify-between">
+										<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+										<button
+											class="text-blue-600 hover:text-blue-900 text-sm"
+											on:click={() => openEtherscan(vault)}
+										>
+											{shortenAddress(vault)}
+										</button>
 									</div>
-									<div class="flex justify-between">
-										<span class="text-sm text-gray-500">Available Rewards</span>
-										<span class="text-sm font-medium text-gray-900">{vault.rewards} {SNT_TOKEN.symbol}</span>
+									<div class="mt-4 space-y-3">
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">Staked Amount</span>
+											<span class="text-sm font-medium text-gray-900">-</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">Available Rewards</span>
+											<span class="text-sm font-medium text-gray-900">-</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">APR</span>
+											<span class="text-sm font-medium text-gray-900">-</span>
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
-					{/each}
+						{/each}
+					</div>
 				</div>
-			</div>
+			{/if}
 		</div>
 	{:else}
 		<div class="mx-auto mt-16 max-w-2xl text-center">
