@@ -1,6 +1,6 @@
 import { createPublicClient, http, createWalletClient, custom, type WalletClient, formatEther, type Address, formatUnits } from 'viem';
 import { sepolia } from 'viem/chains';
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 
 const rpcUrl = import.meta.env.VITE_RPC_URL;
 
@@ -95,6 +95,66 @@ export const formattedSntBalance = derived(sntBalance, ($balance) => {
 	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(4);
 });
 
+// Contract addresses
+export const STAKING_MANAGER = {
+	address: '0xd302bd9f60c5192e46258028a2f3b4b2b846f61f' as Address
+} as const;
+
+export const VAULT_FACTORY = {
+	address: '0xef5EDC2C16413EFAfB1d8e5F2e4a25b16eb7480d' as Address
+} as const;
+
+// Contract ABIs
+const STAKING_MANAGER_ABI = [
+	{
+		"inputs": [{"internalType": "address","name": "user","type": "address"}],
+		"name": "getUserVaults",
+		"outputs": [{"internalType": "address[]","name": "","type": "address[]"}],
+		"stateMutability": "view",
+		"type": "function"
+	}
+] as const;
+
+const VAULT_FACTORY_ABI = [
+	{
+		"inputs": [],
+		"name": "createVault",
+		"outputs": [{"internalType": "contract StakeVault","name": "","type": "address"}],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+] as const;
+
+// Vault ABI
+const VAULT_ABI = [
+	{
+		"inputs": [],
+		"name": "register",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "amountStaked",
+		"outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+		"stateMutability": "view",
+		"type": "function"
+	}
+] as const;
+
+// Stores for staking data
+export const userVaults = writable<Address[]>([]);
+export const vaultStakedAmounts = writable<Record<Address, bigint>>({});
+export const totalStaked = derived(vaultStakedAmounts, ($amounts) => {
+	return Object.values($amounts).reduce((sum, amount) => sum + amount, 0n);
+});
+
+export const formattedTotalStaked = derived(totalStaked, ($total) => {
+	if ($total === undefined) return '0';
+	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(4);
+});
+
 // Function to fetch ETH balance
 async function fetchBalance(address: Address) {
 	try {
@@ -132,6 +192,67 @@ async function fetchSntBalance(address: Address) {
 	}
 }
 
+// Function to fetch staked amount for a single vault
+async function fetchVaultStakedAmount(vaultAddress: Address) {
+	try {
+		const amount = await publicClient.readContract({
+			address: vaultAddress,
+			abi: VAULT_ABI,
+			functionName: 'amountStaked'
+		});
+		return amount;
+	} catch (error) {
+		console.error(`Failed to fetch staked amount for vault ${vaultAddress}:`, error);
+		return 0n;
+	}
+}
+
+// Function to fetch all vault staked amounts
+async function fetchAllVaultStakedAmounts(vaults: readonly Address[]) {
+	try {
+		console.log('Fetching staked amounts for all vaults');
+		const amounts = await Promise.all(vaults.map(fetchVaultStakedAmount));
+		const amountsMap = vaults.reduce((acc, vault, i) => {
+			acc[vault] = amounts[i];
+			return acc;
+		}, {} as Record<Address, bigint>);
+		vaultStakedAmounts.set(amountsMap);
+	} catch (error) {
+		console.error('Failed to fetch vault staked amounts:', error);
+		vaultStakedAmounts.set({});
+	}
+}
+
+// Function to fetch user vaults
+async function fetchUserVaults(address: Address) {
+	try {
+		console.log('Fetching vaults for address:', address);
+		const vaults = await publicClient.readContract({
+			address: STAKING_MANAGER.address,
+			abi: STAKING_MANAGER_ABI,
+			functionName: 'getUserVaults',
+			args: [address]
+		});
+		console.log('Received vaults:', vaults);
+		userVaults.set([...vaults]);
+		
+		// After getting vaults, fetch their staked amounts
+		await fetchAllVaultStakedAmounts(vaults);
+	} catch (error) {
+		console.error('Failed to fetch user vaults:', error);
+		userVaults.set([]);
+		vaultStakedAmounts.set({});
+	}
+}
+
+// Function to refresh balances
+export async function refreshBalances(address: Address) {
+	await Promise.all([
+		fetchBalance(address),
+		fetchSntBalance(address)
+	]);
+}
+
 // Function to connect wallet
 export async function connectWallet() {
 	if (!window.ethereum) {
@@ -153,24 +274,12 @@ export async function connectWallet() {
 	walletAddress.set(address);
 	walletClient.set(client);
 
-	// Fetch initial balances
+	// Fetch initial balances and vaults
 	await Promise.all([
 		fetchBalance(address),
-		fetchSntBalance(address)
+		fetchSntBalance(address),
+		fetchUserVaults(address)
 	]);
-
-	// Set up balance refresh on block
-	const unwatch = publicClient.watchBlocks({
-		onBlock: async () => {
-			const currentAddress = address;
-			if (currentAddress) {
-				await Promise.all([
-					fetchBalance(currentAddress),
-					fetchSntBalance(currentAddress)
-				]);
-			}
-		}
-	});
 
 	// Listen for account changes
 	window.ethereum.on('accountsChanged', async (newAccounts: string[]) => {
@@ -181,7 +290,8 @@ export async function connectWallet() {
 			walletAddress.set(newAddress);
 			await Promise.all([
 				fetchBalance(newAddress),
-				fetchSntBalance(newAddress)
+				fetchSntBalance(newAddress),
+				fetchUserVaults(newAddress)
 			]);
 		}
 	});
@@ -199,4 +309,89 @@ export function disconnectWallet() {
 	walletBalance.set(undefined);
 	sntBalance.set(undefined);
 	sntError.set(undefined);
+	userVaults.set([]);
+}
+
+// Function to deploy a new vault
+export async function deployVault() {
+	const address = get(walletAddress);
+	const client = get(walletClient);
+
+	if (!address || !client) {
+		throw new Error('Wallet not connected');
+	}
+
+	console.log('Deploying new vault...');
+	
+	const hash = await client.writeContract({
+		chain: sepolia,
+		account: address,
+		address: VAULT_FACTORY.address,
+		abi: VAULT_FACTORY_ABI,
+		functionName: 'createVault'
+	});
+
+	console.log('Vault deployment transaction hash:', hash);
+
+	const receipt = await publicClient.waitForTransactionReceipt({ hash });
+	console.log('Vault deployment receipt:', receipt);
+
+	// Refresh both vaults and balances after deployment since gas was spent
+	await Promise.all([
+		fetchUserVaults(address),
+		refreshBalances(address)
+	]);
+
+	return { hash, receipt };
+}
+
+// Function to register a vault
+export async function registerVault(vaultAddress: Address) {
+	const address = get(walletAddress);
+	const client = get(walletClient);
+
+	if (!address || !client) {
+		throw new Error('Wallet not connected');
+	}
+
+	console.log('Registering vault:', vaultAddress);
+	
+	const hash = await client.writeContract({
+		chain: sepolia,
+		account: address,
+		address: vaultAddress,
+		abi: VAULT_ABI,
+		functionName: 'register'
+	});
+
+	console.log('Vault registration transaction hash:', hash);
+
+	const receipt = await publicClient.waitForTransactionReceipt({ 
+		hash,
+		confirmations: 1
+	});
+	console.log('Vault registration receipt:', receipt);
+
+	// Refresh both vaults and balances after registration since gas was spent
+	await Promise.all([
+		fetchUserVaults(address),
+		refreshBalances(address)
+	]);
+
+	return { hash, receipt };
+}
+
+// Function to stake tokens
+export async function stakeTokens(vaultAddress: Address, amount: bigint) {
+	const address = get(walletAddress);
+	const client = get(walletClient);
+
+	if (!address || !client) {
+		throw new Error('Wallet not connected');
+	}
+
+	// ... staking implementation will go here ...
+
+	// After staking, refresh balances since tokens were transferred
+	await refreshBalances(address);
 }
