@@ -25,6 +25,7 @@ Component Development
 - Implement proper component composition and reusability.
 - Use Svelte's props for data passing.
 - Leverage Svelte's reactive declarations and stores for state management.
+- Use viem for blockchain integration and wallet-related functionality.
 
 Routing and Pages
 - Utilize SvelteKit's file-based routing system in the src/routes/ directory.
@@ -110,4 +111,4 @@ Performance Metrics
 - Use Lighthouse and WebPageTest for performance auditing.
 - Implement performance budgets and monitoring.
 
-Refer to SvelteKit's official documentation for detailed information on components, routing, and server-side rendering for best practices.
+Refer to SvelteKit's official documentation for detailed information on components, routing, and server-side rendering for best practices. Same for viem.
