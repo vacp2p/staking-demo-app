@@ -1,34 +1,14 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedTotalStaked, vaultStakedAmounts, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultMpBalances, formattedTotalMpBalance } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance } from '$lib/viem';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatUnits } from 'viem';
 	import { onMount } from 'svelte';
 
-	const SNT_USD_RATE = 0.04298;
-
-	// Dummy data for demonstration
-	const stakingStats = {
-		totalStaked: '150,000',
-		totalRewards: '2,500',
-		averageAPR: '100',
-		globalStats: {
-			totalSntStaked: '2,000,000',
-			get totalValueUsd() {
-				return Math.floor(Number(this.totalSntStaked.replace(/,/g, '')) * SNT_USD_RATE).toLocaleString()
-			}
-		}
-	};
-
-	const userStats = {
-		totalStaked: '5,000',
-		availableRewards: '125',
-		vaults: [
-			{ id: 1, staked: '2,000', rewards: '50', apr: '12.5' },
-			{ id: 2, staked: '1,500', rewards: '37', apr: '12.5' },
-			{ id: 3, staked: '1,500', rewards: '37', apr: '12.5' }
-		]
-	};
+	// Calculate total staked from account information
+	$: userTotalStaked = formatAmount(
+		Object.values($vaultAccounts).reduce((sum, account) => sum + account.stakedBalance, 0n)
+	);
 
 	// Calculate total value in USD
 	$: totalValueUsd = $globalTotalStaked ? 
@@ -50,6 +30,12 @@
 		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 	}
 
+	function isLocked(vault: Address): boolean {
+		const account = $vaultAccounts[vault];
+		if (!account) return false;
+		return account.lockUntil > BigInt(Math.floor(Date.now() / 1000));
+	}
+
 	// Fetch data when navigating to overview page
 	$: if ($page.url.pathname === '/') {
 		fetchTotalStaked();
@@ -66,14 +52,14 @@
 	{#if $walletAddress}
 		<div class="mx-auto mt-8 max-w-4xl">
 			<!-- First row -->
-			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				{#if $userVaults.length > 0}
 					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 						<div class="flex flex-col">
 							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Total Staked</h3>
 							<div class="mt-4 flex items-baseline justify-end gap-x-2">
 								<span class="text-4xl font-bold tracking-tight text-gray-900">
-									{$formattedTotalStaked}
+									{userTotalStaked}
 								</span>
 								<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
 							</div>
@@ -110,18 +96,6 @@
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
 								{$userVaults.length}
 							</span>
-						</div>
-					</div>
-				</div>
-
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">MP Reward Rate</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{stakingStats.averageAPR}
-							</span>
-							<span class="text-sm font-semibold leading-6 text-gray-500">%</span>
 						</div>
 					</div>
 				</div>
@@ -168,13 +142,25 @@
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Rewards</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-gray-200">
 									{#each $userVaults as vault, i}
 										<tr>
-											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">#{i + 1}</td>
+											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+												<div class="flex items-center gap-2">
+													{#if isLocked(vault)}
+														<svg class="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+														</svg>
+													{:else}
+														<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+														</svg>
+													{/if}
+													#{i + 1}
+												</div>
+											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
 												<button
 													class="text-blue-600 hover:text-blue-900"
@@ -184,12 +170,11 @@
 												</button>
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
-												{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0.00'} {SNT_TOKEN.symbol}
+												{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
-												{$vaultMpBalances[vault] ? formatAmount($vaultMpBalances[vault]) : '0.00'} MP
+												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
 											</td>
-											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
 										</tr>
 									{/each}
 								</tbody>
@@ -200,10 +185,21 @@
 					<!-- Card view (mobile) -->
 					<div class="mt-4 space-y-4 sm:hidden">
 						{#each $userVaults as vault, i}
-							<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-900/5">
+							<div class="overflow-hidden rounded-lg bg-white shadow">
 								<div class="px-4 py-5">
 									<div class="flex items-center justify-between">
-										<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+										<div class="flex items-center gap-2">
+											{#if isLocked(vault)}
+												<svg class="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+												</svg>
+											{:else}
+												<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+												</svg>
+											{/if}
+											<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+										</div>
 										<button
 											class="text-blue-600 hover:text-blue-900 text-sm"
 											on:click={() => openEtherscan(vault)}
@@ -215,18 +211,14 @@
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">Staked Amount</span>
 											<span class="text-sm font-medium text-gray-900">
-												{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0.00'} {SNT_TOKEN.symbol}
+												{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
 											</span>
 										</div>
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">MPs</span>
 											<span class="text-sm font-medium text-gray-900">
-												{$vaultMpBalances[vault] ? formatAmount($vaultMpBalances[vault]) : '0.00'} MP
+												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
 											</span>
-										</div>
-										<div class="flex justify-between">
-											<span class="text-sm text-gray-500">Rewards</span>
-											<span class="text-sm font-medium text-gray-900">-</span>
 										</div>
 									</div>
 								</div>

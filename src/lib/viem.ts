@@ -104,7 +104,17 @@ export const VAULT_FACTORY = {
 	address: '0xef5EDC2C16413EFAfB1d8e5F2e4a25b16eb7480d' as Address
 } as const;
 
-// Contract ABIs
+// Add Account type
+type Account = {
+	stakedBalance: bigint;
+	accountRewardIndex: bigint;
+	mpAccrued: bigint;
+	maxMP: bigint;
+	lastMPUpdateTime: bigint;
+	lockUntil: bigint;
+};
+
+// Update STAKING_MANAGER_ABI
 const STAKING_MANAGER_ABI = [
 	{
 		"inputs": [{"internalType": "address","name": "user","type": "address"}],
@@ -126,9 +136,29 @@ const STAKING_MANAGER_ABI = [
 		"outputs": [{"internalType": "uint256","name": "","type": "uint256"}],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [{"internalType": "address","name": "accountAddress","type": "address"}],
+		"name": "getAccount",
+		"outputs": [{
+			"components": [
+				{"internalType": "uint256","name": "stakedBalance","type": "uint256"},
+				{"internalType": "uint256","name": "accountRewardIndex","type": "uint256"},
+				{"internalType": "uint256","name": "mpAccrued","type": "uint256"},
+				{"internalType": "uint256","name": "maxMP","type": "uint256"},
+				{"internalType": "uint256","name": "lastMPUpdateTime","type": "uint256"},
+				{"internalType": "uint256","name": "lockUntil","type": "uint256"}
+			],
+			"internalType": "struct StakingManager.Account",
+			"name": "",
+			"type": "tuple"
+		}],
+		"stateMutability": "view",
+		"type": "function"
 	}
 ] as const;
 
+// Contract ABIs
 const VAULT_FACTORY_ABI = [
 	{
 		"inputs": [],
@@ -169,13 +199,14 @@ const VAULT_ABI = [
 
 // Stores for staking data
 export const userVaults = writable<Address[]>([]);
-export const vaultStakedAmounts = writable<Record<Address, bigint>>({});
-export const totalStaked = derived(vaultStakedAmounts, ($amounts) => {
-	return Object.values($amounts).reduce((sum, amount) => sum + amount, 0n);
+export const vaultAccounts = writable<Record<Address, Account>>({});
+
+export const totalMpBalance = derived(vaultAccounts, ($accounts) => {
+	return Object.values($accounts).reduce((sum, account) => sum + account.mpAccrued, 0n);
 });
 
-export const formattedTotalStaked = derived(totalStaked, ($total) => {
-	if ($total === undefined) return '0';
+export const formattedTotalMpBalance = derived(totalMpBalance, ($total) => {
+	if ($total === undefined) return '0.00';
 	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
 });
 
@@ -190,17 +221,6 @@ export const formattedGlobalTotalStaked = derived(globalTotalStaked, ($total) =>
 
 // Add new store for token price
 export const tokenPriceUsd = writable<number>(0);
-
-// Add new store for MP balances
-export const vaultMpBalances = writable<Record<Address, bigint>>({});
-export const totalMpBalance = derived(vaultMpBalances, ($balances) => {
-	return Object.values($balances).reduce((sum, balance) => sum + balance, 0n);
-});
-
-export const formattedTotalMpBalance = derived(totalMpBalance, ($total) => {
-	if ($total === undefined) return '0.00';
-	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
-});
 
 // Function to fetch ETH balance
 async function fetchBalance(address: Address) {
@@ -239,66 +259,37 @@ async function fetchSntBalance(address: Address) {
 	}
 }
 
-// Function to fetch staked amount for a single vault
-async function fetchVaultStakedAmount(vaultAddress: Address) {
+// Function to fetch account info for a single vault
+async function fetchVaultAccount(vaultAddress: Address) {
 	try {
-		const amount = await publicClient.readContract({
-			address: vaultAddress,
-			abi: VAULT_ABI,
-			functionName: 'amountStaked'
-		});
-		return amount;
-	} catch (error) {
-		console.error(`Failed to fetch staked amount for vault ${vaultAddress}:`, error);
-		return 0n;
-	}
-}
-
-// Function to fetch all vault staked amounts
-async function fetchAllVaultStakedAmounts(vaults: readonly Address[]) {
-	try {
-		console.log('Fetching staked amounts for all vaults');
-		const amounts = await Promise.all(vaults.map(fetchVaultStakedAmount));
-		const amountsMap = vaults.reduce((acc, vault, i) => {
-			acc[vault] = amounts[i];
-			return acc;
-		}, {} as Record<Address, bigint>);
-		vaultStakedAmounts.set(amountsMap);
-	} catch (error) {
-		console.error('Failed to fetch vault staked amounts:', error);
-		vaultStakedAmounts.set({});
-	}
-}
-
-// Function to fetch MP balance for a single vault
-async function fetchVaultMpBalance(vaultAddress: Address) {
-	try {
-		const balance = await publicClient.readContract({
+		const account = await publicClient.readContract({
 			address: STAKING_MANAGER.address,
 			abi: STAKING_MANAGER_ABI,
-			functionName: 'mpBalanceOf',
+			functionName: 'getAccount',
 			args: [vaultAddress]
 		});
-		return balance;
+		return account;
 	} catch (error) {
-		console.error(`Failed to fetch MP balance for vault ${vaultAddress}:`, error);
-		return 0n;
+		console.error(`Failed to fetch account info for vault ${vaultAddress}:`, error);
+		return null;
 	}
 }
 
-// Function to fetch all vault MP balances
-async function fetchAllVaultMpBalances(vaults: readonly Address[]) {
+// Function to fetch all vault accounts
+async function fetchAllVaultAccounts(vaults: readonly Address[]) {
 	try {
-		console.log('Fetching MP balances for all vaults');
-		const balances = await Promise.all(vaults.map(fetchVaultMpBalance));
-		const balancesMap = vaults.reduce((acc, vault, i) => {
-			acc[vault] = balances[i];
+		console.log('Fetching account info for all vaults');
+		const accounts = await Promise.all(vaults.map(fetchVaultAccount));
+		const accountsMap = vaults.reduce((acc, vault, i) => {
+			if (accounts[i]) {
+				acc[vault] = accounts[i];
+			}
 			return acc;
-		}, {} as Record<Address, bigint>);
-		vaultMpBalances.set(balancesMap);
+		}, {} as Record<Address, Account>);
+		vaultAccounts.set(accountsMap);
 	} catch (error) {
-		console.error('Failed to fetch vault MP balances:', error);
-		vaultMpBalances.set({});
+		console.error('Failed to fetch vault accounts:', error);
+		vaultAccounts.set({});
 	}
 }
 
@@ -315,16 +306,12 @@ async function fetchUserVaults(address: Address) {
 		console.log('Received vaults:', vaults);
 		userVaults.set([...vaults]);
 		
-		// After getting vaults, fetch their staked amounts and MP balances
-		await Promise.all([
-			fetchAllVaultStakedAmounts(vaults),
-			fetchAllVaultMpBalances(vaults)
-		]);
+		// Only fetch account data, which includes staked amounts and MPs
+		await fetchAllVaultAccounts(vaults);
 	} catch (error) {
 		console.error('Failed to fetch user vaults:', error);
 		userVaults.set([]);
-		vaultStakedAmounts.set({});
-		vaultMpBalances.set({});
+		vaultAccounts.set({});
 	}
 }
 
