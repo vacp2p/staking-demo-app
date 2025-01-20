@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient } from '$lib/viem';
-	import { decodeEventLog } from 'viem';
+	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultStakedAmounts } from '$lib/viem';
+	import { decodeEventLog, formatUnits } from 'viem';
 	import TransactionModal from '$lib/components/TransactionModal.svelte';
 	import type { Address, Log } from 'viem';
 
 	let amount = '';
 	let selectedVaultId = '';
+	let selectedLockVaultId = '';
 	let isDeploying = false;
 	let deployError: string | undefined;
 
@@ -18,6 +19,10 @@
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	}
 
+	function formatAmount(amount: bigint): string {
+		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+	}
+
 	// Dummy data for demonstration
 	const existingVaults = [
 		{ id: 1, staked: '2,000' },
@@ -28,7 +33,7 @@
 	const stakingInfo = {
 		minStake: '100',
 		maxVaults: 5,
-		apr: '12.5'
+		apr: '100'
 	};
 
 	function handleStake() {
@@ -179,7 +184,7 @@
 					<h2 class="text-base font-semibold leading-7 text-gray-900">Stake SNT</h2>
 					<div class="{$userVaults.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
 						<p class="mt-1 text-sm leading-6 text-gray-500">
-							Stake your SNT tokens to earn rewards. Minimum stake amount is {stakingInfo.minStake} {SNT_TOKEN.symbol}.
+							Stake your SNT tokens to earn rewards.
 						</p>
 
 						<form
@@ -234,7 +239,7 @@
 							</div>
 
 							<div class="mt-6 flex items-center justify-between text-sm">
-								<span class="text-gray-500">Current APR</span>
+								<span class="text-gray-500">MP Reward Rate</span>
 								<span class="font-medium text-gray-900">{stakingInfo.apr}%</span>
 							</div>
 
@@ -247,6 +252,77 @@
 								</button>
 							</div>
 						</form>
+					</div>
+				</div>
+			</div>
+
+			<!-- Lock Form Box -->
+			<div class="mt-6 relative overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+				<div class="p-8">
+					<h2 class="text-base font-semibold leading-7 text-gray-900">Lock Your Stake</h2>
+					<div class="{$userVaults.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
+						<p class="mt-1 text-sm leading-6 text-gray-500">
+							Lock your staking vault to earn bonus Multiplier Points.
+						</p>
+
+						{#if $userVaults.some(vault => $vaultStakedAmounts[vault] && $vaultStakedAmounts[vault] > 0n)}
+							<form
+								class="mt-6"
+								on:submit|preventDefault={() => alert('Locking functionality will be implemented later')}
+							>
+								<div class="space-y-2">
+									<label
+										for="lockVault"
+										class="block text-sm font-medium leading-6 text-gray-900"
+									>
+										Select Vault
+									</label>
+									<select
+										id="lockVault"
+										bind:value={selectedLockVaultId}
+										class="block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+										required
+									>
+										<option value="">Select a vault</option>
+										{#each $userVaults as vault, i}
+											{#if $vaultStakedAmounts[vault] && $vaultStakedAmounts[vault] > 0n}
+												<option value={vault}>
+													Vault #{i + 1} - {shortenAddress(vault)} ({formatAmount($vaultStakedAmounts[vault])} {SNT_TOKEN.symbol})
+												</option>
+											{/if}
+										{/each}
+									</select>
+								</div>
+
+								<div class="mt-6 flex items-center justify-between text-sm">
+									<span class="text-gray-500">Lock Duration</span>
+									<span class="font-medium text-gray-900">12 months</span>
+								</div>
+
+								<div class="mt-6 flex items-center justify-between text-sm">
+									<span class="text-gray-500">MP Bonus Rate</span>
+									<span class="font-medium text-gray-900">+50%</span>
+								</div>
+
+								<div class="mt-6">
+									<button
+										type="submit"
+										class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+									>
+										Lock Stake
+									</button>
+								</div>
+							</form>
+						{:else}
+							<div class="mt-6 rounded-lg bg-gray-50 px-6 py-8">
+								<div class="text-center">
+									<p class="text-sm font-medium text-gray-900">
+										You need to stake tokens in a vault first!
+									</p>
+									
+								</div>
+							</div>
+						{/if}
 					</div>
 				</div>
 			</div>

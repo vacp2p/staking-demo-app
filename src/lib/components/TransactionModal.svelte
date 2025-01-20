@@ -61,7 +61,7 @@
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- Background overlay -->
-		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+		<div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
 
 		<!-- Modal panel -->
 		<div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
@@ -127,6 +127,7 @@
 									<button
 										class="flex-shrink-0 text-green-500 hover:text-green-600"
 										on:click={() => txHash && openEtherscan(txHash)}
+										aria-label="View deployment transaction on Etherscan"
 									>
 										<svg
 											class="h-8 w-8"
@@ -149,6 +150,7 @@
 										<button
 											class="mt-1 text-sm text-blue-600 hover:text-blue-700 truncate"
 											on:click={() => openAddressEtherscan(vaultAddress)}
+											aria-label="View vault address on Etherscan"
 										>
 											Vault: {vaultAddress}
 										</button>
@@ -203,6 +205,7 @@
 									<button
 										class="flex-shrink-0 text-green-500 hover:text-green-600"
 										on:click={() => registrationHash && openEtherscan(registrationHash)}
+										aria-label="View registration transaction on Etherscan"
 									>
 										<svg
 											class="h-8 w-8"
@@ -222,6 +225,7 @@
 									<button
 										class="flex-shrink-0 text-blue-600 hover:text-blue-700"
 										on:click={handleRegisterClick}
+										aria-label="Register vault"
 									>
 										<svg
 											class="h-8 w-8"
