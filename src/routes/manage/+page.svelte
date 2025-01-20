@@ -59,13 +59,13 @@
 									scope="col"
 									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
 								>
-									Available Rewards
+									MPs
 								</th>
 								<th
 									scope="col"
 									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
 								>
-									APR
+									MP Reward Rate
 								</th>
 								<th
 									scope="col"
@@ -99,12 +99,15 @@
 										</button>
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-										{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '-'} {SNT_TOKEN.symbol}
+										{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0'} {SNT_TOKEN.symbol}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-										-
+										0
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
+										100%
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
 										-
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
@@ -154,15 +157,15 @@
 						<div class="px-4 py-4 space-y-3">
 							<div class="flex justify-between">
 								<span class="text-sm text-gray-500">Staked Amount</span>
-								<span class="text-sm font-medium text-gray-900">-</span>
+								<span class="text-sm font-medium text-gray-900">{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0'} {SNT_TOKEN.symbol}</span>
 							</div>
 							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">Available Rewards</span>
-								<span class="text-sm font-medium text-gray-900">-</span>
+								<span class="text-sm text-gray-500">MPs</span>
+								<span class="text-sm font-medium text-gray-900">0</span>
 							</div>
 							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">APR</span>
-								<span class="text-sm font-medium text-gray-900">-</span>
+								<span class="text-sm text-gray-500">MP Reward Rate</span>
+								<span class="text-sm font-medium text-gray-900">100%</span>
 							</div>
 							<div class="flex justify-between">
 								<span class="text-sm text-gray-500">Lock End</span>

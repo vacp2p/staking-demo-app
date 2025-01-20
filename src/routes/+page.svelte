@@ -9,7 +9,7 @@
 	const stakingStats = {
 		totalStaked: '150,000',
 		totalRewards: '2,500',
-		averageAPR: '12.5',
+		averageAPR: '100',
 		globalStats: {
 			totalSntStaked: '2,000,000',
 			get totalValueUsd() {
@@ -65,12 +65,12 @@
 
 					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 						<div class="flex flex-col">
-							<h3 class="text-sm font-medium leading-6 text-gray-500">Available Rewards</h3>
+							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Multiplier Points</h3>
 							<div class="mt-4 flex items-baseline justify-end gap-x-2">
 								<span class="text-4xl font-bold tracking-tight text-gray-900">
 									{userStats.availableRewards}
 								</span>
-								<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+								<span class="text-sm font-semibold leading-6 text-gray-500">MPs</span>
 							</div>
 						</div>
 					</div>
@@ -99,7 +99,7 @@
 
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Current APR</h3>
+						<h3 class="text-sm font-medium leading-6 text-gray-500">MP Reward Rate</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
 								{stakingStats.averageAPR}
@@ -149,9 +149,9 @@
 									<tr>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Vault ID</th>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Staked Amount</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Available Rewards</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">APR</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Rewards</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-gray-200">

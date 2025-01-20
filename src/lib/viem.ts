@@ -92,7 +92,7 @@ export const formattedBalance = derived(walletBalance, ($balance) => {
 
 export const formattedSntBalance = derived(sntBalance, ($balance) => {
 	if ($balance === undefined) return undefined;
-	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(4);
+	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
 });
 
 // Contract addresses
@@ -152,7 +152,7 @@ export const totalStaked = derived(vaultStakedAmounts, ($amounts) => {
 
 export const formattedTotalStaked = derived(totalStaked, ($total) => {
 	if ($total === undefined) return '0';
-	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(4);
+	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
 });
 
 // Function to fetch ETH balance
@@ -394,4 +394,8 @@ export async function stakeTokens(vaultAddress: Address, amount: bigint) {
 
 	// After staking, refresh balances since tokens were transferred
 	await refreshBalances(address);
+}
+
+function formatAmount(amount: bigint): string {
+	return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 }
