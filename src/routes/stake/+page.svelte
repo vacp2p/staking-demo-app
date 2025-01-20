@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultStakedAmounts, stakeTokens } from '$lib/viem';
+	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultAccounts, sntBalance, stakeTokens } from '$lib/viem';
 	import { decodeEventLog, formatUnits, parseUnits, type Address } from 'viem';
 	import TransactionModal from '$lib/components/TransactionModal.svelte';
 	import StakingModal from '$lib/components/StakingModal.svelte';
@@ -52,6 +52,11 @@
 		maxVaults: 5,
 		apr: '100'
 	};
+
+	function getVaultBalance(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		return account?.stakedBalance ? formatAmount(account.stakedBalance) : '0.00';
+	}
 
 	async function handleStake() {
 		if (!selectedVaultId || !amount) return;
@@ -278,7 +283,7 @@
 								<select
 									id="vault"
 									bind:value={selectedVaultId}
-									class="block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+									class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
 									required
 								>
 									<option value="">Select a vault</option>
@@ -303,7 +308,7 @@
 										id="amount"
 										bind:value={amount}
 										placeholder="0"
-										class="block w-full rounded-lg border-0 py-2 pr-16 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+										class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
 										required
 									/>
 									<div class="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -342,7 +347,7 @@
 							Lock your staking vault to earn bonus Multiplier Points.
 						</p>
 
-						{#if $userVaults.some(vault => $vaultStakedAmounts[vault] && $vaultStakedAmounts[vault] > 0n)}
+						{#if $userVaults.some(vault => $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n)}
 							<form
 								class="mt-6"
 								on:submit|preventDefault={() => alert('Locking functionality will be implemented later')}
@@ -357,14 +362,14 @@
 									<select
 										id="lockVault"
 										bind:value={selectedLockVaultId}
-										class="block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+										class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
 										required
 									>
 										<option value="">Select a vault</option>
 										{#each $userVaults as vault, i}
-											{#if $vaultStakedAmounts[vault] && $vaultStakedAmounts[vault] > 0n}
+											{#if $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n}
 												<option value={vault}>
-													Vault #{i + 1} - {shortenAddress(vault)} ({formatAmount($vaultStakedAmounts[vault])} {SNT_TOKEN.symbol})
+													Vault #{i + 1} - {shortenAddress(vault)} ({formatAmount($vaultAccounts[vault].stakedBalance)} {SNT_TOKEN.symbol})
 												</option>
 											{/if}
 										{/each}
@@ -380,7 +385,7 @@
 												{selectedLockVaultId}
 											</button>
 											<p class="mt-1 text-sm text-gray-600">
-												Balance: {formatAmount($vaultStakedAmounts[selectedLockVaultId])} {SNT_TOKEN.symbol}
+												Balance: {formatAmount($vaultAccounts[selectedLockVaultId].stakedBalance)} {SNT_TOKEN.symbol}
 											</p>
 										</div>
 									{/if}
@@ -423,7 +428,7 @@
 													min="0"
 													max="4"
 													step="1"
-													class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
 												/>
 											</div>
@@ -440,7 +445,7 @@
 													bind:value={lockDurationDays}
 													min="1"
 													max="1460"
-													class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
 												/>
 											</div>
@@ -451,8 +456,8 @@
 								<div class="mt-6 flex items-center justify-between text-sm">
 									<span class="text-gray-500">MP Bonus</span>
 									<span class="font-medium">
-										{#if selectedLockVaultId && $vaultStakedAmounts[selectedLockVaultId]}
-											{@const bonus = $vaultStakedAmounts[selectedLockVaultId] * BigInt(Math.floor(lockDurationDays / 365 * 1e18)) / 1000000000000000000n}
+										{#if selectedLockVaultId && $vaultAccounts[selectedLockVaultId] && $vaultAccounts[selectedLockVaultId].stakedBalance > 0n}
+											{@const bonus = $vaultAccounts[selectedLockVaultId].stakedBalance * BigInt(Math.floor(lockDurationDays / 365 * 1e18)) / 1000000000000000000n}
 											<div class={bonus > 0n ? "px-2 py-0.5 rounded bg-green-50" : ""}>
 												<span class={bonus > 0n ? "text-green-600" : "text-gray-900"}>{formatAmount(bonus)} MP</span>
 											</div>

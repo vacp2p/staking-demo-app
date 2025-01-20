@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { walletAddress, SNT_TOKEN, userVaults, vaultStakedAmounts } from '$lib/viem';
-	import { formatUnits } from 'viem';
+	import { walletAddress, SNT_TOKEN, userVaults, vaultAccounts } from '$lib/viem';
+	import { formatUnits, type Address } from 'viem';
 
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -11,15 +11,24 @@
 	}
 
 	function formatAmount(amount: bigint): string {
-		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(4);
+		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 	}
 
 	function handleUnstake(vaultId: number) {
 		alert(`Unstaking functionality for vault #${vaultId} will be implemented later`);
 	}
 
-	function handleClaimRewards(vaultId: number) {
-		alert(`Claiming rewards for vault #${vaultId} will be implemented later`);
+	function isLocked(vault: Address): boolean {
+		const account = $vaultAccounts[vault];
+		if (!account) return false;
+		return account.lockUntil > BigInt(Math.floor(Date.now() / 1000));
+	}
+
+	function formatLockUntil(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		if (!account || account.lockUntil === 0n) return '-';
+		const date = new Date(Number(account.lockUntil) * 1000);
+		return date.toLocaleDateString();
 	}
 </script>
 
@@ -37,47 +46,23 @@
 					<table class="min-w-full divide-y divide-gray-300">
 						<thead class="bg-gray-50">
 							<tr>
-								<th
-									scope="col"
-									class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
-								>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
 									Vault ID
 								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-								>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
 									Address
 								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-								>
+								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
 									Staked Amount
 								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-								>
+								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
 									MPs
 								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900"
-								>
-									MP Reward Rate
+								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+									Max MPs
 								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-								>
-									Lock Period
-								</th>
-								<th
-									scope="col"
-									class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-								>
-									Lock End
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+									Lock Until
 								</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>
@@ -87,10 +72,21 @@
 						<tbody class="divide-y divide-gray-200 bg-white">
 							{#each $userVaults as vault, i}
 								<tr>
-									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-										#{i + 1}
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
+										<div class="flex items-center gap-2">
+											{#if isLocked(vault)}
+												<svg class="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+												</svg>
+											{:else}
+												<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+												</svg>
+											{/if}
+											#{i + 1}
+										</div>
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
 										<button
 											class="text-blue-600 hover:text-blue-900"
 											on:click={() => openEtherscan(vault)}
@@ -98,39 +94,26 @@
 											{shortenAddress(vault)}
 										</button>
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-										{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0'} {SNT_TOKEN.symbol}
+									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-900">
+										{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-										0
+									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-900">
+										{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-500">
-										100%
+									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-900">
+										{$vaultAccounts[vault]?.maxMP ? formatAmount($vaultAccounts[vault].maxMP) : '0.00'} MP
 									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										-
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										-
-									</td>
-									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-										-
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+										{formatLockUntil(vault)}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<div class="flex justify-end gap-x-3">
-											<button
-												on:click={() => handleClaimRewards(i + 1)}
-												class="text-blue-600 hover:text-blue-900"
-											>
-												Claim Rewards
-											</button>
-											<button
-												on:click={() => handleUnstake(i + 1)}
-												class="text-blue-600 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed"
-											>
-												Unstake
-											</button>
-										</div>
+										<button
+											on:click={() => handleUnstake(i + 1)}
+											class="rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
+											disabled={isLocked(vault)}
+										>
+											Unstake
+										</button>
 									</td>
 								</tr>
 							{/each}
@@ -140,12 +123,23 @@
 			</div>
 
 			<!-- Card view (mobile) -->
-			<div class="mt-8 space-y-4 sm:hidden">
+			<div class="mt-4 space-y-4 sm:hidden">
 				{#each $userVaults as vault, i}
-					<div class="bg-white overflow-hidden shadow rounded-lg divide-y divide-gray-200">
-						<div class="px-4 py-5 sm:px-6">
-							<div class="flex justify-between items-center">
-								<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+					<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-900/5">
+						<div class="px-4 py-5">
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									{#if isLocked(vault)}
+										<svg class="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+										</svg>
+									{:else}
+										<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+										</svg>
+									{/if}
+									<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+								</div>
 								<button
 									class="text-blue-600 hover:text-blue-900 text-sm"
 									on:click={() => openEtherscan(vault)}
@@ -153,38 +147,41 @@
 									{shortenAddress(vault)}
 								</button>
 							</div>
-						</div>
-						<div class="px-4 py-4 space-y-3">
-							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">Staked Amount</span>
-								<span class="text-sm font-medium text-gray-900">{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0'} {SNT_TOKEN.symbol}</span>
+							<div class="mt-4 space-y-3">
+								<div class="flex justify-between">
+									<span class="text-sm text-gray-500">Staked Amount</span>
+									<span class="text-sm font-medium text-gray-900">
+										{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
+									</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-sm text-gray-500">MPs</span>
+									<span class="text-sm font-medium text-gray-900">
+										{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
+									</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-sm text-gray-500">Max MPs</span>
+									<span class="text-sm font-medium text-gray-900">
+										{$vaultAccounts[vault]?.maxMP ? formatAmount($vaultAccounts[vault].maxMP) : '0.00'} MP
+									</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-sm text-gray-500">Lock Until</span>
+									<span class="text-sm font-medium text-gray-900">
+										{formatLockUntil(vault)}
+									</span>
+								</div>
 							</div>
-							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">MPs</span>
-								<span class="text-sm font-medium text-gray-900">0</span>
+							<div class="mt-4">
+								<button
+									on:click={() => handleUnstake(i + 1)}
+									class="w-full rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+									disabled={isLocked(vault)}
+								>
+									Unstake
+								</button>
 							</div>
-							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">MP Reward Rate</span>
-								<span class="text-sm font-medium text-gray-900">100%</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-sm text-gray-500">Lock End</span>
-								<span class="text-sm font-medium text-gray-900">-</span>
-							</div>
-						</div>
-						<div class="px-4 py-4 flex gap-3">
-							<button
-								on:click={() => handleClaimRewards(i + 1)}
-								class="flex-1 rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
-							>
-								Claim Rewards
-							</button>
-							<button
-								on:click={() => handleUnstake(i + 1)}
-								class="flex-1 rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
-							>
-								Unstake
-							</button>
 						</div>
 					</div>
 				{/each}
