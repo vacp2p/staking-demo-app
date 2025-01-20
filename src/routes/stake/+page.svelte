@@ -1,19 +1,32 @@
 <script lang="ts">
-	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultStakedAmounts } from '$lib/viem';
-	import { decodeEventLog, formatUnits } from 'viem';
+	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultStakedAmounts, stakeTokens } from '$lib/viem';
+	import { decodeEventLog, formatUnits, parseUnits, type Address } from 'viem';
 	import TransactionModal from '$lib/components/TransactionModal.svelte';
-	import type { Address, Log } from 'viem';
+	import StakingModal from '$lib/components/StakingModal.svelte';
 
 	let amount = '';
 	let selectedVaultId = '';
-	let selectedLockVaultId = '';
+	let selectedLockVaultId: Address | '' = '';
+	let lockDurationDays = 365; // Default to 1 year
 	let isDeploying = false;
 	let deployError: string | undefined;
+	let stakingError: string | undefined;
 
 	// Transaction modal state
 	let isModalOpen = false;
 	let txHash: string | undefined;
 	let deployedVaultAddress: Address | undefined;
+
+	// Staking modal state
+	let isStakingModalOpen = false;
+	let isCheckingAllowance = false;
+	let isApproving = false;
+	let isStaking = false;
+	let isCompleted = false;
+	let approvalHash: string | undefined;
+	let stakingHash: string | undefined;
+	let isAllowanceSet = false;
+	let isResettingAllowance = false;
 
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -21,6 +34,10 @@
 
 	function formatAmount(amount: bigint): string {
 		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+	}
+
+	function openAddressEtherscan(address: string) {
+		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
 	}
 
 	// Dummy data for demonstration
@@ -36,8 +53,66 @@
 		apr: '100'
 	};
 
-	function handleStake() {
-		alert('Staking functionality will be implemented later');
+	async function handleStake() {
+		if (!selectedVaultId || !amount) return;
+
+		try {
+			stakingError = undefined;
+			isStakingModalOpen = true;
+			isCheckingAllowance = true;
+			isResettingAllowance = false;
+			approvalHash = undefined;
+			stakingHash = undefined;
+			isAllowanceSet = false;
+			isApproving = false;
+			isStaking = false;
+			isCompleted = false;
+
+			const amountToStake = parseUnits(amount, SNT_TOKEN.decimals);
+			
+			// Subscribe to state updates from stakeTokens
+			await stakeTokens(selectedVaultId as Address, amountToStake, {
+				onApprovalSubmitted: (hash) => {
+					approvalHash = hash;
+					isApproving = true;
+					isCheckingAllowance = false;
+				},
+				onApprovalConfirmed: () => {
+					isAllowanceSet = true;
+					isApproving = false;
+				},
+				onStakingSubmitted: (hash) => {
+					stakingHash = hash;
+					isStaking = true;
+				},
+				onStakingConfirmed: () => {
+					isStaking = false;
+					isCompleted = true;
+				},
+				onAllowanceAlreadySet: () => {
+					isCheckingAllowance = false;
+					isAllowanceSet = true;
+				}
+			});
+
+		} catch (error) {
+			console.error('Failed to stake:', error);
+			stakingError = error instanceof Error ? error.message : 'Failed to stake';
+			isStakingModalOpen = false;
+		} finally {
+			isCheckingAllowance = false;
+			isResettingAllowance = false;
+		}
+	}
+
+	function handleCloseStakingModal() {
+		isStakingModalOpen = false;
+		approvalHash = undefined;
+		stakingHash = undefined;
+		isApproving = false;
+		isStaking = false;
+		isCompleted = false;
+		isResettingAllowance = false;
 		amount = '';
 		selectedVaultId = '';
 	}
@@ -189,7 +264,9 @@
 
 						<form
 							class="mt-6"
-							on:submit|preventDefault={handleStake}
+							on:submit|preventDefault={async (e) => {
+								await handleStake();
+							}}
 						>
 							<div class="space-y-2">
 								<label
@@ -292,16 +369,95 @@
 											{/if}
 										{/each}
 									</select>
+
+									{#if selectedLockVaultId}
+										<div class="mt-4 rounded-lg bg-gray-50 px-4 py-3">
+											<button
+												type="button"
+												class="text-sm text-blue-600 hover:text-blue-700 truncate"
+												on:click={() => openAddressEtherscan(selectedLockVaultId)}
+											>
+												{selectedLockVaultId}
+											</button>
+											<p class="mt-1 text-sm text-gray-600">
+												Balance: {formatAmount($vaultStakedAmounts[selectedLockVaultId])} {SNT_TOKEN.symbol}
+											</p>
+										</div>
+									{/if}
+								</div>
+
+								<div class="mt-6 space-y-2">
+									<label class="block text-sm font-medium leading-6 text-gray-900">
+										Lock Duration
+									</label>
+									<div>
+										<input
+											type="range"
+											min="1"
+											max="1460"
+											bind:value={lockDurationDays}
+											class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+										/>
+										<div class="mt-1 flex justify-between text-xs text-gray-500">
+											<span>1 day</span>
+											<span>1 year</span>
+											<span>2 years</span>
+											<span>3 years</span>
+											<span>4 years</span>
+										</div>
+									</div>
+									<div class="mt-4 flex gap-4 items-start">
+										<div class="flex-1">
+											<label for="durationYears" class="block text-sm font-medium text-gray-700 mb-1">Years</label>
+											<div class="relative">
+												<input
+													type="number"
+													id="durationYears"
+													value={Number((lockDurationDays / 365).toFixed(2))}
+													on:input={(e) => {
+														const years = Number(e.currentTarget.value);
+														if (!isNaN(years)) {
+															lockDurationDays = Math.round(years * 365);
+														}
+													}}
+													min="0"
+													max="4"
+													step="1"
+													class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+													placeholder="0"
+												/>
+											</div>
+										</div>
+										<div class="flex-none pt-7">
+											<span class="text-sm text-gray-500">or</span>
+										</div>
+										<div class="flex-1">
+											<label for="durationDays" class="block text-sm font-medium text-gray-700 mb-1">Days</label>
+											<div class="relative">
+												<input
+													type="number"
+													id="durationDays"
+													bind:value={lockDurationDays}
+													min="1"
+													max="1460"
+													class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+													placeholder="0"
+												/>
+											</div>
+										</div>
+									</div>
 								</div>
 
 								<div class="mt-6 flex items-center justify-between text-sm">
-									<span class="text-gray-500">Lock Duration</span>
-									<span class="font-medium text-gray-900">12 months</span>
-								</div>
-
-								<div class="mt-6 flex items-center justify-between text-sm">
-									<span class="text-gray-500">MP Bonus Rate</span>
-									<span class="font-medium text-gray-900">+50%</span>
+									<span class="text-gray-500">MP Bonus</span>
+									<span class="font-medium">
+										{#if selectedLockVaultId && $vaultStakedAmounts[selectedLockVaultId]}
+											{@const bonus = $vaultStakedAmounts[selectedLockVaultId] * BigInt(Math.floor(lockDurationDays / 365 * 1e18)) / 1000000000000000000n}
+											<div class={bonus > 0n ? "px-2 py-0.5 rounded bg-green-50" : ""}>
+												<span class={bonus > 0n ? "text-green-600" : "text-gray-900"}>{formatAmount(bonus)} MP</span>
+											</div>
+										{/if}
+									</span>
 								</div>
 
 								<div class="mt-6">
@@ -319,7 +475,6 @@
 									<p class="text-sm font-medium text-gray-900">
 										You need to stake tokens in a vault first!
 									</p>
-									
 								</div>
 							</div>
 						{/if}
@@ -344,4 +499,19 @@
 	vaultAddress={deployedVaultAddress}
 	isDeploying={isDeploying}
 	isDeployed={!isDeploying && txHash !== undefined}
+/>
+
+<StakingModal
+	isOpen={isStakingModalOpen}
+	onClose={handleCloseStakingModal}
+	approvalHash={approvalHash}
+	stakingHash={stakingHash}
+	vaultAddress={selectedVaultId as Address | undefined}
+	isCheckingAllowance={isCheckingAllowance}
+	isApproving={isApproving}
+	isStaking={isStaking}
+	isCompleted={isCompleted}
+	amount={amount}
+	isAllowanceSet={isAllowanceSet}
+	isResettingAllowance={isResettingAllowance}
 /> 
