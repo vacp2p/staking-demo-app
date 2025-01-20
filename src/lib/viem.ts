@@ -112,6 +112,20 @@ const STAKING_MANAGER_ABI = [
 		"outputs": [{"internalType": "address[]","name": "","type": "address[]"}],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalStaked",
+		"outputs": [{"internalType": "uint256","name": "","type": "uint256"}],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [{"internalType": "address","name": "vault","type": "address"}],
+		"name": "mpBalanceOf",
+		"outputs": [{"internalType": "uint256","name": "","type": "uint256"}],
+		"stateMutability": "view",
+		"type": "function"
 	}
 ] as const;
 
@@ -140,6 +154,16 @@ const VAULT_ABI = [
 		"outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [
+			{"internalType": "uint256", "name": "_amount", "type": "uint256"},
+			{"internalType": "uint256", "name": "_seconds", "type": "uint256"}
+		],
+		"name": "stake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	}
 ] as const;
 
@@ -152,6 +176,29 @@ export const totalStaked = derived(vaultStakedAmounts, ($amounts) => {
 
 export const formattedTotalStaked = derived(totalStaked, ($total) => {
 	if ($total === undefined) return '0';
+	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+// Add new store for total staked
+export const globalTotalStaked = writable<bigint>(0n);
+export const formattedGlobalTotalStaked = derived(globalTotalStaked, ($total) => {
+	if ($total === undefined) return '0';
+	return Number(formatUnits($total, SNT_TOKEN.decimals))
+		.toFixed(2)
+		.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+});
+
+// Add new store for token price
+export const tokenPriceUsd = writable<number>(0);
+
+// Add new store for MP balances
+export const vaultMpBalances = writable<Record<Address, bigint>>({});
+export const totalMpBalance = derived(vaultMpBalances, ($balances) => {
+	return Object.values($balances).reduce((sum, balance) => sum + balance, 0n);
+});
+
+export const formattedTotalMpBalance = derived(totalMpBalance, ($total) => {
+	if ($total === undefined) return '0.00';
 	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
 });
 
@@ -223,6 +270,38 @@ async function fetchAllVaultStakedAmounts(vaults: readonly Address[]) {
 	}
 }
 
+// Function to fetch MP balance for a single vault
+async function fetchVaultMpBalance(vaultAddress: Address) {
+	try {
+		const balance = await publicClient.readContract({
+			address: STAKING_MANAGER.address,
+			abi: STAKING_MANAGER_ABI,
+			functionName: 'mpBalanceOf',
+			args: [vaultAddress]
+		});
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch MP balance for vault ${vaultAddress}:`, error);
+		return 0n;
+	}
+}
+
+// Function to fetch all vault MP balances
+async function fetchAllVaultMpBalances(vaults: readonly Address[]) {
+	try {
+		console.log('Fetching MP balances for all vaults');
+		const balances = await Promise.all(vaults.map(fetchVaultMpBalance));
+		const balancesMap = vaults.reduce((acc, vault, i) => {
+			acc[vault] = balances[i];
+			return acc;
+		}, {} as Record<Address, bigint>);
+		vaultMpBalances.set(balancesMap);
+	} catch (error) {
+		console.error('Failed to fetch vault MP balances:', error);
+		vaultMpBalances.set({});
+	}
+}
+
 // Function to fetch user vaults
 async function fetchUserVaults(address: Address) {
 	try {
@@ -236,12 +315,49 @@ async function fetchUserVaults(address: Address) {
 		console.log('Received vaults:', vaults);
 		userVaults.set([...vaults]);
 		
-		// After getting vaults, fetch their staked amounts
-		await fetchAllVaultStakedAmounts(vaults);
+		// After getting vaults, fetch their staked amounts and MP balances
+		await Promise.all([
+			fetchAllVaultStakedAmounts(vaults),
+			fetchAllVaultMpBalances(vaults)
+		]);
 	} catch (error) {
 		console.error('Failed to fetch user vaults:', error);
 		userVaults.set([]);
 		vaultStakedAmounts.set({});
+		vaultMpBalances.set({});
+	}
+}
+
+// Function to fetch total staked
+async function fetchTotalStaked() {
+	try {
+		console.log('Fetching total staked amount');
+		const total = await publicClient.readContract({
+			address: STAKING_MANAGER.address,
+			abi: STAKING_MANAGER_ABI,
+			functionName: 'totalStaked'
+		});
+		console.log('Received total staked:', total.toString());
+		globalTotalStaked.set(total);
+	} catch (error) {
+		console.error('Failed to fetch total staked:', error);
+		globalTotalStaked.set(0n);
+	}
+}
+
+// Function to fetch token price from Binance
+async function fetchTokenPrice() {
+	try {
+		console.log('Fetching SNT price from Binance');
+		const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=SNTUSDT');
+		const data = await response.json();
+		const price = parseFloat(data.price);
+		console.log('Received SNT price:', price);
+		tokenPriceUsd.set(price);
+		return price;
+	} catch (error) {
+		console.error('Failed to fetch SNT price:', error);
+		return null;
 	}
 }
 
@@ -249,7 +365,9 @@ async function fetchUserVaults(address: Address) {
 export async function refreshBalances(address: Address) {
 	await Promise.all([
 		fetchBalance(address),
-		fetchSntBalance(address)
+		fetchSntBalance(address),
+		fetchTotalStaked(),
+		fetchUserVaults(address)
 	]);
 }
 
@@ -382,7 +500,17 @@ export async function registerVault(vaultAddress: Address) {
 }
 
 // Function to stake tokens
-export async function stakeTokens(vaultAddress: Address, amount: bigint) {
+export async function stakeTokens(
+	vaultAddress: Address,
+	amount: bigint,
+	callbacks?: {
+		onApprovalSubmitted?: (hash: string) => void;
+		onApprovalConfirmed?: () => void;
+		onStakingSubmitted?: (hash: string) => void;
+		onStakingConfirmed?: () => void;
+		onAllowanceAlreadySet?: () => void;
+	}
+) {
 	const address = get(walletAddress);
 	const client = get(walletClient);
 
@@ -390,12 +518,103 @@ export async function stakeTokens(vaultAddress: Address, amount: bigint) {
 		throw new Error('Wallet not connected');
 	}
 
-	// ... staking implementation will go here ...
+	console.log('Staking tokens:', { vaultAddress, amount: amount.toString() });
+	
+	// First check current allowance
+	const currentAllowance = await publicClient.readContract({
+		address: SNT_TOKEN.address,
+		abi: CONTRACT_ABI,
+		functionName: 'allowance',
+		args: [address, vaultAddress]
+	});
 
-	// After staking, refresh balances since tokens were transferred
+	console.log('Current allowance:', currentAllowance.toString());
+	let approvalHash: `0x${string}` | undefined;
+	let allowanceWasSet = false;
+
+	// Only approve if the current allowance is less than the amount we want to stake
+	if (currentAllowance < amount) {
+		console.log('Approving tokens...');
+		
+		// If there's an existing non-zero allowance, we need to reset it first
+		if (currentAllowance > 0n) {
+			console.log('Resetting existing allowance to 0...');
+			approvalHash = await client.writeContract({
+				chain: sepolia,
+				account: address,
+				address: SNT_TOKEN.address,
+				abi: CONTRACT_ABI,
+				functionName: 'approve',
+				args: [vaultAddress, 0n]
+			});
+
+			console.log('Reset allowance transaction hash:', approvalHash);
+			callbacks?.onApprovalSubmitted?.(approvalHash);
+
+			const resetReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+			if (resetReceipt.status !== 'success') {
+				throw new Error('Reset allowance transaction failed');
+			}
+		}
+
+		// Now set the new allowance
+		approvalHash = await client.writeContract({
+			chain: sepolia,
+			account: address,
+			address: SNT_TOKEN.address,
+			abi: CONTRACT_ABI,
+			functionName: 'approve',
+			args: [vaultAddress, amount]
+		});
+
+		console.log('Token approval transaction hash:', approvalHash);
+		callbacks?.onApprovalSubmitted?.(approvalHash);
+
+		const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+		if (approvalReceipt.status !== 'success') {
+			throw new Error('Approval transaction failed');
+		}
+		callbacks?.onApprovalConfirmed?.();
+	} else {
+		console.log('Sufficient allowance already exists');
+		allowanceWasSet = true;
+		callbacks?.onAllowanceAlreadySet?.();
+	}
+
+	// Then stake the tokens
+	const stakingHash = await client.writeContract({
+		chain: sepolia,
+		account: address,
+		address: vaultAddress,
+		abi: VAULT_ABI,
+		functionName: 'stake',
+		args: [amount, 0n] // 0 seconds lock period
+	});
+
+	console.log('Staking transaction hash:', stakingHash);
+	callbacks?.onStakingSubmitted?.(stakingHash);
+
+	const receipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
+	console.log('Staking receipt:', receipt);
+
+	if (receipt.status !== 'success') {
+		throw new Error('Staking transaction failed');
+	}
+	
+	callbacks?.onStakingConfirmed?.();
+
+	// Refresh balances and vault data
 	await refreshBalances(address);
+
+	return { approvalHash, hash: stakingHash, receipt, allowanceWasSet };
 }
 
 function formatAmount(amount: bigint): string {
 	return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 }
+
+// Initial fetch of total staked
+fetchTotalStaked();
+
+// Export the fetch functions to be used by components
+export { fetchTotalStaked, fetchTokenPrice };

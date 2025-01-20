@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedTotalStaked, vaultStakedAmounts } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedTotalStaked, vaultStakedAmounts, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultMpBalances, formattedTotalMpBalance } from '$lib/viem';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { formatUnits } from 'viem';
+	import { onMount } from 'svelte';
 
 	const SNT_USD_RATE = 0.04298;
 
@@ -28,6 +30,10 @@
 		]
 	};
 
+	// Calculate total value in USD
+	$: totalValueUsd = $globalTotalStaked ? 
+		Math.floor(Number(formatUnits($globalTotalStaked, SNT_TOKEN.decimals)) * $tokenPriceUsd).toLocaleString() : '0';
+
 	function handleStartStaking() {
 		goto('/stake');
 	}
@@ -41,8 +47,19 @@
 	}
 
 	function formatAmount(amount: bigint): string {
-		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(4);
+		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 	}
+
+	// Fetch data when navigating to overview page
+	$: if ($page.url.pathname === '/') {
+		fetchTotalStaked();
+		fetchTokenPrice();
+	}
+
+	onMount(() => {
+		fetchTotalStaked();
+		fetchTokenPrice();
+	});
 </script>
 
 <div class="mx-auto max-w-7xl px-6 lg:px-8">
@@ -68,7 +85,7 @@
 							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Multiplier Points</h3>
 							<div class="mt-4 flex items-baseline justify-end gap-x-2">
 								<span class="text-4xl font-bold tracking-tight text-gray-900">
-									{userStats.availableRewards}
+									{$formattedTotalMpBalance}
 								</span>
 								<span class="text-sm font-semibold leading-6 text-gray-500">MPs</span>
 							</div>
@@ -117,7 +134,7 @@
 						<h3 class="text-sm font-medium leading-6 text-gray-500">Total SNT Staked</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{stakingStats.globalStats.totalSntStaked}
+								{$formattedGlobalTotalStaked}
 							</span>
 							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
 						</div>
@@ -129,7 +146,7 @@
 						<h3 class="text-sm font-medium leading-6 text-gray-500">Total Value Staked</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								${stakingStats.globalStats.totalValueUsd}
+								${totalValueUsd}
 							</span>
 							<span class="text-sm font-semibold leading-6 text-gray-500">USD</span>
 						</div>
@@ -166,8 +183,12 @@
 													{shortenAddress(vault)}
 												</button>
 											</td>
-											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
-											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
+												{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0.00'} {SNT_TOKEN.symbol}
+											</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
+												{$vaultMpBalances[vault] ? formatAmount($vaultMpBalances[vault]) : '0.00'} MP
+											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">-</td>
 										</tr>
 									{/each}
@@ -193,14 +214,18 @@
 									<div class="mt-4 space-y-3">
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">Staked Amount</span>
-											<span class="text-sm font-medium text-gray-900">-</span>
+											<span class="text-sm font-medium text-gray-900">
+												{$vaultStakedAmounts[vault] ? formatAmount($vaultStakedAmounts[vault]) : '0.00'} {SNT_TOKEN.symbol}
+											</span>
 										</div>
 										<div class="flex justify-between">
-											<span class="text-sm text-gray-500">Available Rewards</span>
-											<span class="text-sm font-medium text-gray-900">-</span>
+											<span class="text-sm text-gray-500">MPs</span>
+											<span class="text-sm font-medium text-gray-900">
+												{$vaultMpBalances[vault] ? formatAmount($vaultMpBalances[vault]) : '0.00'} MP
+											</span>
 										</div>
 										<div class="flex justify-between">
-											<span class="text-sm text-gray-500">APR</span>
+											<span class="text-sm text-gray-500">Rewards</span>
 											<span class="text-sm font-medium text-gray-900">-</span>
 										</div>
 									</div>
