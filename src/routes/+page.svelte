@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { formatUnits } from 'viem';
 	import { onMount } from 'svelte';
+	import type { Address } from 'viem';
 
 	// Calculate total staked from account information
 	$: userTotalStaked = formatAmount(
@@ -34,6 +35,37 @@
 		const account = $vaultAccounts[vault];
 		if (!account) return false;
 		return account.lockUntil > BigInt(Math.floor(Date.now() / 1000));
+	}
+
+	function formatUnlockDate(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		if (!account || account.lockUntil === 0n) return '-';
+		const date = new Date(Number(account.lockUntil) * 1000);
+		return date.toLocaleString();
+	}
+
+	function formatRemainingLock(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		if (!account || account.lockUntil === 0n) return '-';
+		
+		const now = BigInt(Math.floor(Date.now() / 1000));
+		if (account.lockUntil <= now) return '-';
+		
+		const remainingSeconds = Number(account.lockUntil - now);
+		const days = Math.floor(remainingSeconds / (24 * 3600));
+		
+		if (days > 0) {
+			return `${days} day${days > 1 ? 's' : ''}`;
+		}
+		
+		const hours = Math.floor(remainingSeconds / 3600);
+		const minutes = Math.floor((remainingSeconds % 3600) / 60);
+		
+		if (hours > 0) {
+			return `${hours}h ${minutes}m`;
+		}
+		
+		return `${minutes}m`;
 	}
 
 	// Fetch data when navigating to overview page
@@ -142,6 +174,7 @@
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Remaining Lock</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-gray-200">
@@ -174,6 +207,21 @@
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
 												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
+											</td>
+											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+												{#if isLocked(vault)}
+													<div class="group relative inline-block">
+														<span>{formatRemainingLock(vault)}</span>
+														<div class="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block z-10">
+															<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
+																{formatUnlockDate(vault)}
+															</div>
+															<div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900"></div>
+														</div>
+													</div>
+												{:else}
+													{formatRemainingLock(vault)}
+												{/if}
 											</td>
 										</tr>
 									{/each}
@@ -218,6 +266,24 @@
 											<span class="text-sm text-gray-500">MPs</span>
 											<span class="text-sm font-medium text-gray-900">
 												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
+											</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">Remaining Lock</span>
+											<span class="text-sm font-medium text-gray-900">
+												{#if isLocked(vault)}
+													<div class="group relative inline-block">
+														<span>{formatRemainingLock(vault)}</span>
+														<div class="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block z-10">
+															<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
+																{formatUnlockDate(vault)}
+															</div>
+															<div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900"></div>
+														</div>
+													</div>
+												{:else}
+													{formatRemainingLock(vault)}
+												{/if}
 											</span>
 										</div>
 									</div>

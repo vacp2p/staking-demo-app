@@ -1,13 +1,15 @@
 <script lang="ts">
-	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultAccounts, sntBalance, stakeTokens } from '$lib/viem';
+	import { walletAddress, formattedSntBalance, SNT_TOKEN, userVaults, deployVault, VAULT_FACTORY, publicClient, vaultAccounts, sntBalance, stakeTokens, lockVault } from '$lib/viem';
 	import { decodeEventLog, formatUnits, parseUnits, type Address } from 'viem';
 	import TransactionModal from '$lib/components/TransactionModal.svelte';
 	import StakingModal from '$lib/components/StakingModal.svelte';
+	import LockingModal from '$lib/components/LockingModal.svelte';
 
 	let amount = '';
 	let selectedVaultId = '';
 	let selectedLockVaultId: Address | '' = '';
-	let lockDurationDays = 365; // Default to 1 year
+	const MIN_LOCK_DAYS = 90; // Minimum locking period
+	let lockDurationDays = Math.max(365, MIN_LOCK_DAYS); // Default to 1 year, but never less than minimum
 	let isDeploying = false;
 	let deployError: string | undefined;
 	let stakingError: string | undefined;
@@ -27,6 +29,28 @@
 	let stakingHash: string | undefined;
 	let isAllowanceSet = false;
 	let isResettingAllowance = false;
+
+	// Locking modal state
+	let isLockingModalOpen = false;
+	let lockHash: string | undefined;
+	let isLocking = false;
+	let lockCompleted = false;
+
+	let currentBlockTimestamp = 0n;
+
+	// Get current block timestamp
+	$: {
+		publicClient.getBlock().then(block => {
+			currentBlockTimestamp = block.timestamp;
+		});
+	}
+
+	// Helper function to check if vault is locked
+	function isVaultLocked(vault: Address): boolean {
+		const account = $vaultAccounts[vault];
+		if (!account?.lockUntil) return false;
+		return account.lockUntil > currentBlockTimestamp;
+	}
 
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -175,6 +199,35 @@
 		isModalOpen = false;
 		txHash = undefined;
 		deployedVaultAddress = undefined;
+	}
+
+	async function handleLock() {
+		if (!selectedLockVaultId) return;
+
+		try {
+			isLockingModalOpen = true;
+			isLocking = true;
+			lockHash = undefined;
+			lockCompleted = false;
+
+			const lockDurationSeconds = lockDurationDays * 24 * 60 * 60;
+
+			// Call the lock function on the vault
+			lockHash = await lockVault(selectedLockVaultId as Address, lockDurationSeconds);
+
+			isLocking = false;
+			lockCompleted = true;
+		} catch (error) {
+			console.error('Failed to lock vault:', error);
+			isLockingModalOpen = false;
+		}
+	}
+
+	function handleCloseLockingModal() {
+		isLockingModalOpen = false;
+		lockHash = undefined;
+		isLocking = false;
+		lockCompleted = false;
 	}
 </script>
 
@@ -350,7 +403,7 @@
 						{#if $userVaults.some(vault => $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n)}
 							<form
 								class="mt-6"
-								on:submit|preventDefault={() => alert('Locking functionality will be implemented later')}
+								on:submit|preventDefault={handleLock}
 							>
 								<div class="space-y-2">
 									<label
@@ -367,7 +420,7 @@
 									>
 										<option value="">Select a vault</option>
 										{#each $userVaults as vault, i}
-											{#if $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n}
+											{#if $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n && !isVaultLocked(vault)}
 												<option value={vault}>
 													Vault #{i + 1} - {shortenAddress(vault)} ({formatAmount($vaultAccounts[vault].stakedBalance)} {SNT_TOKEN.symbol})
 												</option>
@@ -393,22 +446,20 @@
 
 								<div class="mt-6 space-y-2">
 									<label class="block text-sm font-medium leading-6 text-gray-900">
-										Lock Duration
+										Lock Duration (minimum 90 days)
 									</label>
 									<div>
 										<input
 											type="range"
-											min="1"
+											min={MIN_LOCK_DAYS}
 											max="1460"
+											step="1"
 											bind:value={lockDurationDays}
 											class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
 										/>
 										<div class="mt-1 flex justify-between text-xs text-gray-500">
-											<span>1 day</span>
-											<span>1 year</span>
-											<span>2 years</span>
-											<span>3 years</span>
-											<span>4 years</span>
+											<span class="text-left">90d</span>
+											<span class="text-right">4y</span>
 										</div>
 									</div>
 									<div class="mt-4 flex gap-4 items-start">
@@ -419,15 +470,20 @@
 													type="number"
 													id="durationYears"
 													value={Number((lockDurationDays / 365).toFixed(2))}
+													on:blur={(e) => {
+														const years = Number(e.currentTarget.value);
+														if (!isNaN(years)) {
+															const days = Math.round(years * 365);
+															lockDurationDays = days < MIN_LOCK_DAYS ? MIN_LOCK_DAYS : Math.min(days, 1460);
+														}
+													}}
 													on:input={(e) => {
 														const years = Number(e.currentTarget.value);
 														if (!isNaN(years)) {
 															lockDurationDays = Math.round(years * 365);
 														}
 													}}
-													min="0"
-													max="4"
-													step="1"
+													step="0.25"
 													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
 												/>
@@ -443,7 +499,7 @@
 													type="number"
 													id="durationDays"
 													bind:value={lockDurationDays}
-													min="1"
+													min={MIN_LOCK_DAYS}
 													max="1460"
 													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
@@ -519,4 +575,14 @@
 	amount={amount}
 	isAllowanceSet={isAllowanceSet}
 	isResettingAllowance={isResettingAllowance}
+/>
+
+<LockingModal
+	isOpen={isLockingModalOpen}
+	onClose={handleCloseLockingModal}
+	lockHash={lockHash}
+	vaultAddress={selectedLockVaultId as Address | undefined}
+	isLocking={isLocking}
+	isCompleted={lockCompleted}
+	lockDurationDays={lockDurationDays}
 /> 
