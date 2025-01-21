@@ -4,6 +4,7 @@
 	import TransactionModal from '$lib/components/TransactionModal.svelte';
 	import StakingModal from '$lib/components/StakingModal.svelte';
 	import LockingModal from '$lib/components/LockingModal.svelte';
+	import { page } from '$app/stores';
 
 	let amount = '';
 	let selectedVaultId = '';
@@ -45,8 +46,32 @@
 		});
 	}
 
+	// Handle vault parameter in URL
+	$: if ($page.url.searchParams.get('vault')) {
+		const vaultFromUrl = $page.url.searchParams.get('vault') as Address;
+		if ($userVaults.includes(vaultFromUrl) && !isLocked(vaultFromUrl) && $vaultAccounts[vaultFromUrl]?.stakedBalance && $vaultAccounts[vaultFromUrl].stakedBalance > 0n) {
+			selectedLockVaultId = vaultFromUrl;
+			// Scroll to the lock form
+			setTimeout(() => {
+				document.getElementById('lockForm')?.scrollIntoView({ behavior: 'smooth' });
+			}, 100);
+		}
+	}
+
+	// Handle stakeVault parameter in URL
+	$: if ($page.url.searchParams.get('stakeVault')) {
+		const vaultFromUrl = $page.url.searchParams.get('stakeVault') as Address;
+		if ($userVaults.includes(vaultFromUrl) && !isLocked(vaultFromUrl)) {
+			selectedVaultId = vaultFromUrl;
+			// Scroll to the stake form
+			setTimeout(() => {
+				document.getElementById('stakeForm')?.scrollIntoView({ behavior: 'smooth' });
+			}, 100);
+		}
+	}
+
 	// Helper function to check if vault is locked
-	function isVaultLocked(vault: Address): boolean {
+	function isLocked(vault: Address): boolean {
 		const account = $vaultAccounts[vault];
 		if (!account?.lockUntil) return false;
 		return account.lockUntil > currentBlockTimestamp;
@@ -321,6 +346,7 @@
 						</p>
 
 						<form
+							id="stakeForm"
 							class="mt-6"
 							on:submit|preventDefault={async (e) => {
 								await handleStake();
@@ -341,9 +367,11 @@
 								>
 									<option value="">Select a vault</option>
 									{#each $userVaults as vault, i}
-										<option value={vault}>
-											Vault #{i + 1} - {shortenAddress(vault)}
-										</option>
+										{#if !isLocked(vault)}
+											<option value={vault}>
+												Vault #{i + 1} - {shortenAddress(vault)}
+											</option>
+										{/if}
 									{/each}
 								</select>
 							</div>
@@ -402,6 +430,7 @@
 
 						{#if $userVaults.some(vault => $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n)}
 							<form
+								id="lockForm"
 								class="mt-6"
 								on:submit|preventDefault={handleLock}
 							>
@@ -420,7 +449,7 @@
 									>
 										<option value="">Select a vault</option>
 										{#each $userVaults as vault, i}
-											{#if $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n && !isVaultLocked(vault)}
+											{#if $vaultAccounts[vault] && $vaultAccounts[vault].stakedBalance > 0n && !isLocked(vault)}
 												<option value={vault}>
 													Vault #{i + 1} - {shortenAddress(vault)} ({formatAmount($vaultAccounts[vault].stakedBalance)} {SNT_TOKEN.symbol})
 												</option>
