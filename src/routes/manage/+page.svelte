@@ -24,11 +24,35 @@
 		return account.lockUntil > BigInt(Math.floor(Date.now() / 1000));
 	}
 
-	function formatLockUntil(vault: Address): string {
+	function formatUnlockDate(vault: Address): string {
 		const account = $vaultAccounts[vault];
 		if (!account || account.lockUntil === 0n) return '-';
 		const date = new Date(Number(account.lockUntil) * 1000);
-		return date.toLocaleDateString();
+		return date.toLocaleString();
+	}
+
+	function formatRemainingLock(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		if (!account || account.lockUntil === 0n) return '-';
+		
+		const now = BigInt(Math.floor(Date.now() / 1000));
+		if (account.lockUntil <= now) return '-';
+		
+		const remainingSeconds = Number(account.lockUntil - now);
+		const days = Math.floor(remainingSeconds / (24 * 3600));
+		
+		if (days > 0) {
+			return `${days} day${days > 1 ? 's' : ''}`;
+		}
+		
+		const hours = Math.floor(remainingSeconds / 3600);
+		const minutes = Math.floor((remainingSeconds % 3600) / 60);
+		
+		if (hours > 0) {
+			return `${hours}h ${minutes}m`;
+		}
+		
+		return `${minutes}m`;
 	}
 </script>
 
@@ -42,7 +66,7 @@
 
 			<!-- Table view (desktop) -->
 			<div class="mt-8 hidden sm:block">
-				<div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+				<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
 					<table class="min-w-full divide-y divide-gray-300">
 						<thead class="bg-gray-50">
 							<tr>
@@ -62,7 +86,7 @@
 									Max MPs
 								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-									Lock Until
+									Remaining Lock
 								</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>
@@ -104,15 +128,27 @@
 										{$vaultAccounts[vault]?.maxMP ? formatAmount($vaultAccounts[vault].maxMP) : '0.00'} MP
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
-										{formatLockUntil(vault)}
+										{#if isLocked(vault)}
+											<div class="group relative inline-block">
+												<span>{formatRemainingLock(vault)}</span>
+												<div class="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block z-10">
+													<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
+														{formatUnlockDate(vault)}
+													</div>
+													<div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900"></div>
+												</div>
+											</div>
+										{:else}
+											{formatRemainingLock(vault)}
+										{/if}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 										<button
 											on:click={() => handleUnstake(i + 1)}
-											class="rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
+											class="rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
 											disabled={isLocked(vault)}
 										>
-											Unstake
+											{isLocked(vault) ? 'Locked' : 'Unstake'}
 										</button>
 									</td>
 								</tr>
@@ -125,7 +161,7 @@
 			<!-- Card view (mobile) -->
 			<div class="mt-4 space-y-4 sm:hidden">
 				{#each $userVaults as vault, i}
-					<div class="overflow-hidden rounded-lg bg-white shadow ring-1 ring-gray-900/5">
+					<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
 						<div class="px-4 py-5">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-2">
@@ -167,19 +203,31 @@
 									</span>
 								</div>
 								<div class="flex justify-between">
-									<span class="text-sm text-gray-500">Lock Until</span>
+									<span class="text-sm text-gray-500">Remaining Lock</span>
 									<span class="text-sm font-medium text-gray-900">
-										{formatLockUntil(vault)}
+										{#if isLocked(vault)}
+											<div class="group relative inline-block">
+												<span>{formatRemainingLock(vault)}</span>
+												<div class="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block z-10">
+													<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
+														{formatUnlockDate(vault)}
+													</div>
+													<div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900"></div>
+												</div>
+											</div>
+										{:else}
+											{formatRemainingLock(vault)}
+										{/if}
 									</span>
 								</div>
 							</div>
 							<div class="mt-4">
 								<button
 									on:click={() => handleUnstake(i + 1)}
-									class="w-full rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+									class="w-full rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
 									disabled={isLocked(vault)}
 								>
-									Unstake
+									{isLocked(vault) ? 'Locked' : 'Unstake'}
 								</button>
 							</div>
 						</div>

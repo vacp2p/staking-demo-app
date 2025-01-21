@@ -4,16 +4,11 @@
 
     export let isOpen = false;
     export let onClose: () => void;
-    export let approvalHash: string | undefined;
-    export let stakingHash: string | undefined;
+    export let lockHash: string | undefined;
     export let vaultAddress: Address | undefined;
-    export let isCheckingAllowance = false;
-    export let isApproving = false;
-    export let isStaking = false;
+    export let isLocking = false;
     export let isCompleted = false;
-    export let amount: string | undefined;
-    export let isAllowanceSet = false;
-    export let isResettingAllowance = false;
+    export let lockDurationDays: number;
 
     function shortenAddress(address: string | undefined): string {
         if (!address) return '';
@@ -71,72 +66,44 @@
                 <div class="sm:flex sm:items-start">
                     <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
                         <h3 class="text-base font-semibold leading-6 text-gray-900" id="modal-title">
-                            Staking {amount} STT tokens
+                            Locking Vault for {lockDurationDays} days
                         </h3>
 
                         <div class="mt-6 space-y-6">
                             <div class="flex flex-col gap-4">
-                                <!-- Approval Step -->
-                                {#if isCheckingAllowance}
+                                <!-- Locking Step -->
+                                {#if isLocking}
                                     <div class="flex items-center gap-3">
                                         <div class="h-8 w-8 flex items-center justify-center">
-                                            <div class="animate-spin">
-                                                <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                            </div>
+                                            {#if lockHash}
+                                                <button 
+                                                    class="cursor-pointer"
+                                                    on:click={() => openTxOnEtherscan(lockHash)}
+                                                >
+                                                    <svg class="h-5 w-5 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                </button>
+                                            {:else}
+                                                <div class="animate-spin">
+                                                    <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                </div>
+                                            {/if}
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900">Increasing token allowance...</p>
-                                        </div>
-                                    </div>
-                                {:else if isApproving}
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-8 w-8 flex items-center justify-center">
-                                            <button 
-                                                class="animate-spin"
-                                                on:click={() => openTxOnEtherscan(approvalHash)}
-                                            >
-                                                <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900">Increasing token allowance...</p>
-                                        </div>
-                                    </div>
-                                {:else if isAllowanceSet}
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-8 w-8 flex items-center justify-center">
-                                            <svg class="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900">Token allowance set</p>
-                                        </div>
-                                    </div>
-                                {/if}
-
-                                <!-- Staking Step -->
-                                {#if isStaking}
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-8 w-8 flex items-center justify-center">
-                                            <button 
-                                                class="animate-spin"
-                                                on:click={() => openTxOnEtherscan(stakingHash)}
-                                            >
-                                                <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900">Staking your tokens...</p>
+                                            <p class="text-sm font-medium text-gray-900">
+                                                {#if lockHash}
+                                                    <button class="text-blue-600 hover:text-blue-700" on:click={() => openTxOnEtherscan(lockHash)}>
+                                                        View transaction on Etherscan
+                                                    </button>
+                                                {:else}
+                                                    Locking your vault...
+                                                {/if}
+                                            </p>
                                         </div>
                                     </div>
                                 {:else if isCompleted}
@@ -147,7 +114,7 @@
                                             </svg>
                                         </div>
                                         <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900">Successfully staked {amount} STT</p>
+                                            <p class="text-sm font-medium text-gray-900">Successfully locked vault for {lockDurationDays} days</p>
                                             <button
                                                 class="mt-1 text-sm text-blue-600 hover:text-blue-700 truncate"
                                                 on:click={() => vaultAddress && openAddressEtherscan(vaultAddress)}

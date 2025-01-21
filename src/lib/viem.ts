@@ -194,6 +194,20 @@ const VAULT_ABI = [
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
+	},
+	{
+		"inputs": [{"internalType": "uint256","name": "_seconds","type": "uint256"}],
+		"name": "lock",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [{"internalType": "uint256","name": "_amount","type": "uint256"}],
+		"name": "unstake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	}
 ] as const;
 
@@ -605,3 +619,38 @@ fetchTotalStaked();
 
 // Export the fetch functions to be used by components
 export { fetchTotalStaked, fetchTokenPrice };
+
+// Function to lock a vault
+export async function lockVault(vaultAddress: Address, lockDurationSeconds: number) {
+	const address = get(walletAddress);
+	const client = get(walletClient);
+
+	if (!address || !client) {
+		throw new Error('Wallet not connected');
+	}
+
+	console.log('Locking vault:', { vaultAddress, lockDurationSeconds });
+
+	const lockHash = await client.writeContract({
+		chain: sepolia,
+		account: address,
+		address: vaultAddress,
+		abi: VAULT_ABI,
+		functionName: 'lock',
+		args: [BigInt(lockDurationSeconds)]
+	});
+
+	console.log('Lock transaction hash:', lockHash);
+
+	const receipt = await publicClient.waitForTransactionReceipt({ hash: lockHash });
+	console.log('Lock receipt:', receipt);
+
+	if (receipt.status !== 'success') {
+		throw new Error('Lock transaction failed');
+	}
+
+	// Refresh vault data
+	await fetchUserVaults(address);
+
+	return lockHash;
+}
