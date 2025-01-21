@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { walletAddress, SNT_TOKEN, userVaults, vaultAccounts } from '$lib/viem';
 	import { formatUnits, type Address } from 'viem';
+	import UnstakingModal from '$lib/components/UnstakingModal.svelte';
+	import { goto } from '$app/navigation';
+
+	let isUnstakingModalOpen = false;
+	let selectedVaultAddress: Address | undefined;
+	let selectedVaultId = 0;
 
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -14,8 +20,16 @@
 		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
 	}
 
-	function handleUnstake(vaultId: number) {
-		alert(`Unstaking functionality for vault #${vaultId} will be implemented later`);
+	function handleUnstake(vault: Address, vaultId: number) {
+		selectedVaultAddress = vault;
+		selectedVaultId = vaultId;
+		isUnstakingModalOpen = true;
+	}
+
+	function handleCloseUnstakingModal() {
+		isUnstakingModalOpen = false;
+		selectedVaultAddress = undefined;
+		selectedVaultId = 0;
 	}
 
 	function isLocked(vault: Address): boolean {
@@ -53,6 +67,18 @@
 		}
 		
 		return `${minutes}m`;
+	}
+
+	function handleLockClick(vault: Address) {
+		if (!isLocked(vault) && $vaultAccounts[vault]?.stakedBalance && $vaultAccounts[vault].stakedBalance > 0n) {
+			goto('/stake?vault=' + vault);
+		}
+	}
+
+	function handleStakeClick(vault: Address) {
+		if (!isLocked(vault)) {
+			goto('/stake?stakeVault=' + vault);
+		}
 	}
 </script>
 
@@ -103,9 +129,17 @@
 													<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
 												</svg>
 											{:else}
-												<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-												</svg>
+												<button
+													class="hover:text-blue-600"
+													on:click={() => handleLockClick(vault)}
+													disabled={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+													class:opacity-50={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+													class:cursor-not-allowed={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+												>
+													<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+													</svg>
+												</button>
 											{/if}
 											#{i + 1}
 										</div>
@@ -143,13 +177,33 @@
 										{/if}
 									</td>
 									<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<button
-											on:click={() => handleUnstake(i + 1)}
-											class="rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-											disabled={isLocked(vault)}
-										>
-											{isLocked(vault) ? 'Locked' : 'Unstake'}
-										</button>
+										<div class="flex items-center justify-end gap-2">
+											<button
+												on:click={() => handleUnstake(vault, i + 1)}
+												class="rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50"
+												disabled={isLocked(vault) || !$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+											>
+												{#if isLocked(vault)}
+													Locked
+												{:else if !$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+													Empty
+												{:else}
+													Unstake
+												{/if}
+											</button>
+											{#if !isLocked(vault)}
+												<button
+													on:click={() => handleStakeClick(vault)}
+													class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
+												>
+													<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+													</svg>
+												</button>
+											{:else}
+												<div class="w-8 h-8"></div>
+											{/if}
+										</div>
 									</td>
 								</tr>
 							{/each}
@@ -170,9 +224,17 @@
 											<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
 										</svg>
 									{:else}
-										<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-										</svg>
+										<button
+											class="hover:text-blue-600"
+											on:click={() => handleLockClick(vault)}
+											disabled={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+											class:opacity-50={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+											class:cursor-not-allowed={!$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+										>
+											<svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+											</svg>
+										</button>
 									{/if}
 									<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
 								</div>
@@ -222,13 +284,33 @@
 								</div>
 							</div>
 							<div class="mt-4">
-								<button
-									on:click={() => handleUnstake(i + 1)}
-									class="w-full rounded-lg bg-white px-2 py-1.5 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-									disabled={isLocked(vault)}
-								>
-									{isLocked(vault) ? 'Locked' : 'Unstake'}
-								</button>
+								<div class="flex items-center gap-2">
+									<button
+										on:click={() => handleUnstake(vault, i + 1)}
+										class="flex-1 rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-50"
+										disabled={isLocked(vault) || !$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+									>
+										{#if isLocked(vault)}
+											Locked
+										{:else if !$vaultAccounts[vault]?.stakedBalance || $vaultAccounts[vault].stakedBalance === 0n}
+											Empty
+										{:else}
+											Unstake
+										{/if}
+									</button>
+									{#if !isLocked(vault)}
+										<button
+											on:click={() => handleStakeClick(vault)}
+											class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
+										>
+											<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+											</svg>
+										</button>
+									{:else}
+										<div class="w-8 h-8"></div>
+									{/if}
+								</div>
 							</div>
 						</div>
 					</div>
@@ -243,4 +325,11 @@
 			</div>
 		</div>
 	{/if}
-</div> 
+</div>
+
+<UnstakingModal
+	isOpen={isUnstakingModalOpen}
+	onClose={handleCloseUnstakingModal}
+	vaultAddress={selectedVaultAddress}
+	vaultId={selectedVaultId}
+/> 

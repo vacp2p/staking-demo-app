@@ -19,6 +19,12 @@
 		goto('/stake');
 	}
 
+	function handleStakeClick(vault: Address) {
+		if (!isLocked(vault)) {
+			goto('/stake?stakeVault=' + vault);
+		}
+	}
+
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	}
@@ -175,6 +181,7 @@
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Remaining Lock</th>
+										<th class="w-[52px]"></th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-gray-200">
@@ -221,6 +228,20 @@
 													</div>
 												{:else}
 													{formatRemainingLock(vault)}
+												{/if}
+											</td>
+											<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+												{#if !isLocked(vault)}
+													<button
+														on:click={() => handleStakeClick(vault)}
+														class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
+													>
+														<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+														</svg>
+													</button>
+												{:else}
+													<div class="w-8 h-8"></div>
 												{/if}
 											</td>
 										</tr>
@@ -286,6 +307,21 @@
 												{/if}
 											</span>
 										</div>
+									</div>
+									<div class="mt-4">
+										{#if !isLocked(vault)}
+											<button
+												on:click={() => handleStakeClick(vault)}
+												class="w-full rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 flex items-center justify-center gap-2"
+											>
+												<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+												</svg>
+												Add Stake
+											</button>
+										{:else}
+											<div class="h-[36px]"></div>
+										{/if}
 									</div>
 								</div>
 							</div>
