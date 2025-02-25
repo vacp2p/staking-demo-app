@@ -29,10 +29,10 @@
 		try {
 			isRegistering = true;
 			registrationError = undefined;
-			
+
 			const { hash, receipt } = await registerVault(vaultAddress);
 			registrationHash = hash;
-			
+
 			// Only set isRegistered after we have confirmation
 			if (receipt.status === 'success') {
 				isRegistered = true;
@@ -90,7 +90,7 @@
 				</div>
 
 				<div class="sm:flex sm:items-start">
-					<div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+					<div class="mt-3 w-full text-center sm:mt-0 sm:text-left">
 						<h3 class="text-base font-semibold leading-6 text-gray-900" id="modal-title">
 							Vault Deployment Status
 						</h3>
@@ -102,7 +102,7 @@
 									<div class="flex-shrink-0">
 										<div class="h-8 w-8">
 											<svg
-												class="animate-spin h-8 w-8 text-blue-600"
+												class="h-8 w-8 animate-spin text-blue-600"
 												xmlns="http://www.w3.org/2000/svg"
 												fill="none"
 												viewBox="0 0 24 24"
@@ -144,11 +144,11 @@
 										</svg>
 									</button>
 								{/if}
-								<div class="flex-1 min-w-0">
+								<div class="min-w-0 flex-1">
 									<p class="text-sm font-medium text-gray-900">Deploy a vault</p>
 									{#if vaultAddress}
 										<button
-											class="mt-1 text-sm text-blue-600 hover:text-blue-700 truncate"
+											class="mt-1 truncate text-sm text-blue-600 hover:text-blue-700"
 											on:click={() => openAddressEtherscan(vaultAddress)}
 											aria-label="View vault address on Etherscan"
 										>
@@ -180,7 +180,7 @@
 									<div class="flex-shrink-0">
 										<div class="h-8 w-8">
 											<svg
-												class="animate-spin h-8 w-8 text-blue-600"
+												class="h-8 w-8 animate-spin text-blue-600"
 												xmlns="http://www.w3.org/2000/svg"
 												fill="none"
 												viewBox="0 0 24 24"
@@ -234,12 +234,7 @@
 											stroke-width="1.5"
 											stroke="currentColor"
 										>
-											<circle
-												cx="12"
-												cy="12"
-												r="9"
-												class="stroke-current"
-											/>
+											<circle cx="12" cy="12" r="9" class="stroke-current" />
 											<path
 												stroke-linecap="round"
 												stroke-linejoin="round"
@@ -248,7 +243,7 @@
 										</svg>
 									</button>
 								{/if}
-								<div class="flex-1 min-w-0">
+								<div class="min-w-0 flex-1">
 									<p class="text-sm font-medium text-gray-900">Register your vault</p>
 									{#if registrationError}
 										<p class="mt-1 text-sm text-red-600">{registrationError}</p>
@@ -271,7 +266,9 @@
 							<!-- Ready to stake message -->
 							{#if isRegistered}
 								<div class="mt-8 text-center">
-									<h4 class="text-lg font-medium text-gray-900">You are ready to stake your SNT!</h4>
+									<h4 class="text-lg font-medium text-gray-900">
+										You are ready to stake your SNT!
+									</h4>
 									<button
 										type="button"
 										class="mt-4 inline-flex justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
@@ -287,4 +284,4 @@
 			</div>
 		</div>
 	</div>
-{/if} 
+{/if}
