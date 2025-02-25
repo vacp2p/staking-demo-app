@@ -42,12 +42,21 @@
 	"dependencies": {
 		"@floating-ui/dom": "^1.6.13",
 		"@inlang/paraglide-sveltekit": "^0.11.1",
+		"@reown/appkit": "^1.6.8",
+		"@reown/appkit-adapter-wagmi": "^1.6.8",
 		"@tailwindcss/container-queries": "^0.1.1",
 		"@tailwindcss/forms": "^0.5.9",
 		"@tailwindcss/typography": "^0.5.15",
+		"@wagmi/core": "^2.16.5",
+		"@web3-onboard/coinbase": "^2.4.2",
+		"@web3-onboard/core": "^2.24.0",
+		"@web3-onboard/injected-wallets": "^2.11.3",
+		"@web3-onboard/walletconnect": "^2.6.2",
 		"flowbite": "^2.5.2",
 		"flowbite-svelte": "^0.47.4",
+		"mode-watcher": "^0.5.1",
 		"tailwindcss-animate": "^1.0.7",
-		"viem": "^2.22.8"
+		"viem": "^2.22.0",
+		"wagmi": "^2.14.12"
 	}
 }
