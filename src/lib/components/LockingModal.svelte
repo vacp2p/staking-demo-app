@@ -77,7 +77,7 @@
 									<div class="flex items-center gap-3">
 										<div class="flex h-8 w-8 items-center justify-center">
 											{#if lockHash}
-												<button class="cursor-pointer" on:click={() => openTxOnEtherscan(lockHash)}>
+												<button class="cursor-pointer" on:click={() => openTxOnEtherscan(lockHash)} aria-label="View transaction in progress">
 													<svg
 														class="h-5 w-5 animate-spin text-blue-600"
 														xmlns="http://www.w3.org/2000/svg"

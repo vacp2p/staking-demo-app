@@ -11,6 +11,7 @@
 	} from '$lib/viem';
 	import { formatUnits, parseUnits, type Hash } from 'viem';
 	import { openExplorer } from '$lib/utils';
+	import { vaultAbi } from '$lib/contracts';
 
 	export let isOpen = false;
 	export let onClose: () => void;
@@ -89,15 +90,7 @@
 				chain: publicClient.chain,
 				account: $walletAddress,
 				address: vaultAddress,
-				abi: [
-					{
-						inputs: [{ internalType: 'uint256', name: '_amount', type: 'uint256' }],
-						name: 'unstake',
-						outputs: [],
-						stateMutability: 'nonpayable',
-						type: 'function'
-					}
-				],
+				abi: vaultAbi,
 				functionName: 'unstake',
 				args: [amountToUnstake]
 			});
@@ -185,7 +178,7 @@
 								<div class="flex items-center gap-3">
 									{#if isUnstaking}
 										<div class="flex h-8 w-8 items-center justify-center">
-											<button class="animate-spin" on:click={() => openTxOnEtherscan(unstakeHash)}>
+											<button class="animate-spin" on:click={() => openTxOnEtherscan(unstakeHash)} aria-label="View unstaking transaction in progress">
 												<svg
 													class="h-5 w-5 text-blue-600"
 													xmlns="http://www.w3.org/2000/svg"
@@ -258,10 +251,11 @@
 							<div class="mt-6 space-y-6">
 								<!-- Amount Slider -->
 								<div>
-									<label class="mb-1 block text-sm font-medium text-gray-700">
+									<label for="unstake-amount" class="mb-1 block text-sm font-medium text-gray-700">
 										Amount to Unstake
 									</label>
 									<input
+										id="unstake-amount"
 										type="range"
 										min="1"
 										max={maxAmount}
@@ -279,7 +273,9 @@
 
 								<!-- Amount Input -->
 								<div class="relative">
+									<label for="unstake-amount-input" class="sr-only">Amount to unstake</label>
 									<input
+										id="unstake-amount-input"
 										type="number"
 										value={amount}
 										on:input={handleAmountInput}

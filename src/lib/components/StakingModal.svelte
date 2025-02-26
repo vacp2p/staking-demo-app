@@ -14,7 +14,7 @@
     export let isCompleted = false;
     export let amount: string | undefined;
     export let isAllowanceSet = false;
-    export let isResettingAllowance = false;
+    export const isResettingAllowance = false;
 
     function shortenAddress(address: string | undefined): string {
         if (!address) return '';
@@ -98,6 +98,7 @@
                                             <button 
                                                 class="animate-spin"
                                                 on:click={() => openTxOnEtherscan(approvalHash)}
+                                                aria-label="View approval transaction in progress"
                                             >
                                                 <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -129,6 +130,7 @@
                                             <button 
                                                 class="animate-spin"
                                                 on:click={() => openTxOnEtherscan(stakingHash)}
+                                                aria-label="View staking transaction in progress"
                                             >
                                                 <svg class="h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
