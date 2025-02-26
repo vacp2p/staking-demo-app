@@ -474,11 +474,12 @@
 								</div>
 
 								<div class="mt-6 space-y-2">
-									<label class="block text-sm font-medium leading-6 text-gray-900">
+									<label for="lock-duration" class="block text-sm font-medium leading-6 text-gray-900">
 										Lock Duration (minimum 90 days)
 									</label>
 									<div>
 										<input
+											id="lock-duration"
 											type="range"
 											min={MIN_LOCK_DAYS}
 											max="1460"
@@ -603,7 +604,6 @@
 	isCompleted={isCompleted}
 	amount={amount}
 	isAllowanceSet={isAllowanceSet}
-	isResettingAllowance={isResettingAllowance}
 />
 
 <LockingModal
