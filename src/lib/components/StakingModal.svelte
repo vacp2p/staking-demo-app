@@ -1,6 +1,7 @@
 <script lang="ts">
     import { fade, fly } from 'svelte/transition';
     import type { Address } from 'viem';
+    import { openExplorer, openAddressExplorer } from '$lib/utils';
 
     export let isOpen = false;
     export let onClose: () => void;
@@ -22,12 +23,12 @@
 
     function openTxOnEtherscan(hash: string | undefined) {
         if (hash) {
-            window.open(`https://sepolia.etherscan.io/tx/${hash}`, '_blank');
+            openExplorer(hash);
         }
     }
 
     function openAddressEtherscan(address: string) {
-        window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+        openAddressExplorer(address as Address);
     }
 </script>
 

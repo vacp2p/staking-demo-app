@@ -10,6 +10,7 @@
 		refreshBalances
 	} from '$lib/viem';
 	import { formatUnits, parseUnits, type Hash } from 'viem';
+	import { openExplorer } from '$lib/utils';
 
 	export let isOpen = false;
 	export let onClose: () => void;
@@ -130,7 +131,7 @@
 
 	function openTxOnEtherscan(hash: string | undefined) {
 		if (hash) {
-			window.open(`https://sepolia.etherscan.io/tx/${hash}`, '_blank');
+			openExplorer(hash);
 		}
 	}
 </script>
