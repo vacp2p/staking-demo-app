@@ -2,6 +2,7 @@
 	import { fade, fly } from 'svelte/transition';
 	import type { Address } from 'viem';
 	import { registerVault } from '$lib/viem';
+	import { openExplorer, openAddressExplorer } from '$lib/utils';
 
 	export let isOpen = false;
 	export let onClose: () => void;
@@ -16,11 +17,11 @@
 	let registrationError: string | undefined;
 
 	function openEtherscan(hash: string) {
-		window.open(`https://sepolia.etherscan.io/tx/${hash}`, '_blank');
+		openExplorer(hash);
 	}
 
 	function openAddressEtherscan(address: string) {
-		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+		openAddressExplorer(address as Address);
 	}
 
 	async function handleRegisterClick() {

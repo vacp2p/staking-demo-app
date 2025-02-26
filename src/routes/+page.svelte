@@ -5,6 +5,7 @@
 	import { formatUnits } from 'viem';
 	import { onMount } from 'svelte';
 	import type { Address } from 'viem';
+	import { openAddressExplorer } from '$lib/utils';
 
 	// Calculate total staked from account information
 	$: userTotalStaked = formatAmount(
@@ -30,7 +31,7 @@
 	}
 
 	function openEtherscan(address: string) {
-		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+		openAddressExplorer(address as Address);
 	}
 
 	function formatAmount(amount: bigint): string {

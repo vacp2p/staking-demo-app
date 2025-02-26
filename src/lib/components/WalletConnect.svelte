@@ -9,6 +9,7 @@
 		sntError
 	} from '$lib/viem';
 	import { connectWithOnboard, disconnectWithOnboard, isConnecting } from '$lib/onboardToViem';
+	import ChainSwitcher from './ChainSwitcher.svelte';
 
 	async function handleConnect() {
 		try {
@@ -29,11 +30,9 @@
 			<div class="flex flex-shrink-0 items-center justify-between sm:justify-start">
 				<div class="flex items-center">
 					<span class="text-lg font-semibold leading-7 text-gray-900"> Status Staking </span>
-					<span
-						class="ml-4 hidden items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 sm:inline-flex"
-					>
-						{network.name}
-					</span>
+					<div class="ml-4 hidden sm:inline-flex">
+						<ChainSwitcher />
+					</div>
 				</div>
 
 				<div class="sm:hidden">

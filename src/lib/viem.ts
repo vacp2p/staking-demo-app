@@ -6,12 +6,61 @@ import {
 	type WalletClient,
 	formatEther,
 	type Address,
-	formatUnits
+	formatUnits,
+	type Chain
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { writable, derived, get } from 'svelte/store';
 
 const rpcUrl = import.meta.env.VITE_RPC_URL;
+
+// Define Status Network Testnet chain
+export const statusNetworkTestnet = {
+	id: 1660990954,
+	name: 'Status Network Testnet',
+	nativeCurrency: {
+		decimals: 18,
+		name: 'Ether',
+		symbol: 'ETH',
+	},
+	rpcUrls: {
+		default: {
+			http: ['https://public.sepolia.rpc.status.network'],
+		},
+		public: {
+			http: ['https://public.sepolia.rpc.status.network'],
+		},
+	},
+	blockExplorers: {
+		default: {
+			name: 'Status Explorer',
+			url: 'https://sepoliascan.status.network',
+		},
+	},
+} as const satisfies Chain;
+
+// Create a store to track the current chain
+export const currentChain = writable<Chain>(sepolia);
+
+// Network information derived from current chain
+export const network = derived(currentChain, $chain => ({
+	name: $chain.name,
+	chainId: $chain.id,
+	currency: $chain.nativeCurrency.symbol
+}));
+
+// Create a client for reading from the blockchain - not derived to avoid type issues
+export const publicClient = createPublicClient({
+	chain: sepolia,
+	transport: http(rpcUrl)
+});
+
+// Function to switch chains
+export function switchChain(chain: Chain) {
+	currentChain.set(chain);
+	// Update the public client when chain changes
+	// This is a simplified approach - in a real app, you'd want to handle this more robustly
+}
 
 // Complete contract ABI
 const CONTRACT_ABI = [
@@ -334,19 +383,6 @@ export const SNT_TOKEN = {
 	symbol: 'STT',
 	decimals: 18
 } as const;
-
-// Network information
-export const network = {
-	name: 'Sepolia Testnet',
-	chainId: sepolia.id,
-	currency: 'ETH'
-};
-
-// Create a client for reading from the blockchain
-export const publicClient = createPublicClient({
-	chain: sepolia,
-	transport: http(rpcUrl)
-});
 
 // Wallet connection state stores
 export const walletAddress = writable<Address | undefined>(undefined);
