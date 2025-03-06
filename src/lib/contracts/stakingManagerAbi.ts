@@ -1,7 +1,7 @@
 export const stakingManagerAbi = [
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
-    name: 'getUserVaults',
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    name: 'getAccountVaults',
     outputs: [{ internalType: 'address[]', name: '', type: 'address[]' }],
     stateMutability: 'view',
     type: 'function'
@@ -14,26 +14,28 @@ export const stakingManagerAbi = [
     type: 'function'
   },
   {
-    inputs: [{ internalType: 'address', name: 'vault', type: 'address' }],
+    inputs: [{ internalType: 'address', name: 'vaultAddress', type: 'address' }],
     name: 'mpBalanceOf',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function'
   },
   {
-    inputs: [{ internalType: 'address', name: 'accountAddress', type: 'address' }],
-    name: 'getAccount',
+    inputs: [{ internalType: 'address', name: 'vaultAddress', type: 'address' }],
+    name: 'getVault',
     outputs: [
       {
         components: [
           { internalType: 'uint256', name: 'stakedBalance', type: 'uint256' },
-          { internalType: 'uint256', name: 'accountRewardIndex', type: 'uint256' },
+          { internalType: 'uint256', name: 'rewardIndex', type: 'uint256' },
           { internalType: 'uint256', name: 'mpAccrued', type: 'uint256' },
           { internalType: 'uint256', name: 'maxMP', type: 'uint256' },
           { internalType: 'uint256', name: 'lastMPUpdateTime', type: 'uint256' },
-          { internalType: 'uint256', name: 'lockUntil', type: 'uint256' }
+          { internalType: 'uint256', name: 'lockUntil', type: 'uint256' },
+          { internalType: 'uint256', name: 'mpStaked', type: 'uint256' },
+          { internalType: 'uint256', name: 'rewardsAccrued', type: 'uint256' }
         ],
-        internalType: 'struct StakingManager.Account',
+        internalType: 'struct RewardsStreamerMP.VaultData',
         name: '',
         type: 'tuple'
       }
