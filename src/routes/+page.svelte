@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance } from '$lib/viem';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatUnits } from 'viem';
@@ -15,6 +15,47 @@
 	// Calculate total value in USD
 	$: totalValueUsd = $globalTotalStaked ? 
 		Math.floor(Number(formatUnits($globalTotalStaked, SNT_TOKEN.decimals)) * $tokenPriceUsd).toLocaleString() : '0';
+
+	// Calculate the earliest unlock time across all vaults
+	$: firstUnlockTime = calculateFirstUnlockTime($userVaults, $vaultAccounts);
+
+	function calculateFirstUnlockTime(vaults: Address[], accounts: Record<Address, any>): string {
+		if (!vaults || vaults.length === 0) {
+			return "No locked vaults";
+		}
+		
+		const now = BigInt(Math.floor(Date.now() / 1000));
+		let earliestUnlock: bigint | null = null;
+		
+		for (const vault of vaults) {
+			const account = accounts[vault];
+			if (account && account.lockUntil > now) {
+				if (earliestUnlock === null || account.lockUntil < earliestUnlock) {
+					earliestUnlock = account.lockUntil;
+				}
+			}
+		}
+		
+		if (earliestUnlock === null) {
+			return "No locked vaults";
+		}
+		
+		const remainingSeconds = Number(earliestUnlock - now);
+		const days = Math.floor(remainingSeconds / (24 * 3600));
+		
+		if (days > 0) {
+			return `${days} day${days > 1 ? 's' : ''}`;
+		}
+		
+		const hours = Math.floor(remainingSeconds / 3600);
+		const minutes = Math.floor((remainingSeconds % 3600) / 60);
+		
+		if (hours > 0) {
+			return `${hours}h ${minutes}m`;
+		}
+		
+		return `${minutes}m`;
+	}
 
 	function handleStartStaking() {
 		goto('/stake');
@@ -36,6 +77,10 @@
 
 	function formatAmount(amount: bigint): string {
 		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+	}
+
+	function formatRewardsAmount(amount: bigint): string {
+		return Number(formatUnits(amount, 18)).toFixed(2);
 	}
 
 	function isLocked(vault: Address): boolean {
@@ -128,20 +173,21 @@
 					</div>
 				{/if}
 
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+				<div class="overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm ring-1 ring-blue-900/5">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
+						<h3 class="text-sm font-medium leading-6 text-blue-700">Your Karma Rewards</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{$userVaults.length}
+							<span class="text-4xl font-bold tracking-tight text-blue-900">
+								{$formattedTotalRewardsBalance}
 							</span>
+							<span class="text-sm font-semibold leading-6 text-blue-700">KARMA</span>
 						</div>
 					</div>
 				</div>
 			</div>
 
 			<!-- Second row -->
-			<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+			<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 					<div class="flex flex-col">
 						<h3 class="text-sm font-medium leading-6 text-gray-500">Total SNT Staked</h3>
@@ -156,12 +202,22 @@
 
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Total Value Staked</h3>
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								${totalValueUsd}
+								{$userVaults.length}
 							</span>
-							<span class="text-sm font-semibold leading-6 text-gray-500">USD</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">First Unlock in</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								{firstUnlockTime}
+							</span>
 						</div>
 					</div>
 				</div>
@@ -182,6 +238,7 @@
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Remaining Lock</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Karma Rewards</th>
 										<th class="w-[52px]"></th>
 									</tr>
 								</thead>
@@ -231,11 +288,15 @@
 													{formatRemainingLock(vault)}
 												{/if}
 											</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
+												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
+											</td>
 											<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 												{#if !isLocked(vault)}
 													<button
 														on:click={() => handleStakeClick(vault)}
 														class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
+														aria-label="Add stake to vault"
 													>
 														<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
 															<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -306,6 +367,12 @@
 												{:else}
 													{formatRemainingLock(vault)}
 												{/if}
+											</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">Karma Rewards</span>
+											<span class="text-sm font-medium text-gray-900">
+												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
 											</span>
 										</div>
 									</div>

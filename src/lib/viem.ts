@@ -106,6 +106,8 @@ type Account = {
 // Stores for staking data
 export const userVaults = writable<Address[]>([]);
 export const vaultAccounts = writable<Record<Address, Account>>({});
+export const rewardsBalance = writable<Record<Address, bigint>>({});
+export const totalRewardsBalance = writable<bigint>(0n);
 
 export const totalMpBalance = derived(vaultAccounts, ($accounts) => {
 	return Object.values($accounts).reduce((sum, account) => sum + account.mpAccrued, 0n);
@@ -114,6 +116,11 @@ export const totalMpBalance = derived(vaultAccounts, ($accounts) => {
 export const formattedTotalMpBalance = derived(totalMpBalance, ($total) => {
 	if ($total === undefined) return '0.00';
 	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+export const formattedTotalRewardsBalance = derived(totalRewardsBalance, ($total) => {
+	if ($total === undefined) return '0.00';
+	return Number(formatUnits($total, 18)).toFixed(2);
 });
 
 // Add new store for total staked
@@ -203,24 +210,45 @@ async function fetchAllVaultAccounts(vaults: readonly Address[]) {
 }
 
 // Function to fetch user vaults
-async function fetchUserVaults(address: Address) {
+export async function fetchUserVaults(address: Address) {
+	console.log(`Fetching vaults for address: ${address} on chain: ${get(currentChain).name} (${get(currentChain).id})`);
+	
+	const chainId = get(currentChain).id;
+	const stakingManagerAddress = STAKING_MANAGER.address;
+	console.log(`Using StakingManager address: ${stakingManagerAddress}`);
+	
 	try {
-		console.log('Fetching vaults for address:', address);
+		// Get the user's vaults
 		const vaults = await publicClient.readContract({
-			address: STAKING_MANAGER.address,
+			address: stakingManagerAddress,
 			abi: stakingManagerAbi,
 			functionName: 'getAccountVaults',
 			args: [address]
-		});
-		console.log('Received vaults:', vaults);
-		userVaults.set([...vaults]);
-
-		// Only fetch account data, which includes staked amounts and MPs
-		await fetchAllVaultAccounts(vaults);
+		}) as Address[];
+		
+		console.log(`Received ${vaults.length} vaults:`, vaults);
+		
+		// Update the store
+		userVaults.set(vaults);
+		
+		// Fetch account data for all vaults
+		if (vaults.length > 0) {
+			await fetchAllVaultAccounts(vaults);
+		} else {
+			vaultAccounts.set({});
+		}
+		
+		return vaults;
 	} catch (error) {
-		console.error('Failed to fetch user vaults:', error);
+		console.error(`Error fetching vaults for ${address}:`, error);
+		console.error(`Error details:`, {
+			chain: get(currentChain),
+			stakingManagerAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
 		userVaults.set([]);
 		vaultAccounts.set({});
+		return [] as Address[];
 	}
 }
 
@@ -259,12 +287,42 @@ async function fetchTokenPrice() {
 
 // Function to refresh balances
 export async function refreshBalances(address: Address) {
-	await Promise.all([
-		fetchBalance(address),
-		fetchSntBalance(address),
-		fetchTotalStaked(),
-		fetchUserVaults(address)
-	]);
+	console.log(`Refreshing balances for address: ${address} on chain: ${get(currentChain).name} (${get(currentChain).id})`);
+	
+	try {
+		// First fetch the user's vaults
+		const vaults = await fetchUserVaults(address);
+		
+		// Then fetch all other data in parallel
+		const results = await Promise.allSettled([
+			fetchBalance(address),
+			fetchSntBalance(address),
+			fetchTotalStaked(),
+			fetchTotalRewardsBalance(address),
+			fetchAllVaultRewardsBalances(vaults)
+		]);
+		
+		// Log results
+		results.forEach((result, index) => {
+			const operation = index === 0 ? 'ETH balance' : 
+							  index === 1 ? 'STT balance' : 
+							  index === 2 ? 'Total staked' : 
+							  index === 3 ? 'Total rewards' :
+							  'Vault rewards';
+							  
+			if (result.status === 'fulfilled') {
+				console.log(`✅ Successfully refreshed ${operation}`);
+			} else {
+				console.error(`❌ Failed to refresh ${operation}:`, result.reason);
+			}
+		});
+		
+		console.log('Balances refresh completed');
+		return true;
+	} catch (error) {
+		console.error('Error refreshing balances:', error);
+		return false;
+	}
 }
 
 // Function to connect wallet
@@ -578,5 +636,93 @@ export async function lockVault(vaultAddress: Address, lockDurationSeconds: numb
 			publicClient: publicClient ? 'Initialized' : 'Not initialized'
 		});
 		throw error;
+	}
+}
+
+// Function to fetch rewards balance for a single vault
+async function fetchVaultRewardsBalance(vaultAddress: Address) {
+	const chainId = get(currentChain).id;
+	const stakingManagerAddress = STAKING_MANAGER.address;
+	
+	try {
+		console.log(`Fetching rewards balance for vault: ${vaultAddress}`);
+		console.log(`Using StakingManager address: ${stakingManagerAddress}`);
+		
+		const balance = await publicClient.readContract({
+			address: stakingManagerAddress,
+			abi: stakingManagerAbi,
+			functionName: 'rewardsBalanceOf',
+			args: [vaultAddress]
+		}) as bigint;
+		
+		console.log(`Received rewards balance for vault ${vaultAddress}: ${balance.toString()}`);
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch rewards balance for vault ${vaultAddress}:`, error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			stakingManagerAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		return 0n;
+	}
+}
+
+// Function to fetch total rewards balance for a user across all vaults
+export async function fetchTotalRewardsBalance(address: Address) {
+	const chainId = get(currentChain).id;
+	const stakingManagerAddress = STAKING_MANAGER.address;
+	
+	try {
+		console.log(`Fetching total rewards balance for user: ${address}`);
+		console.log(`Using StakingManager address: ${stakingManagerAddress}`);
+		
+		const balance = await publicClient.readContract({
+			address: stakingManagerAddress,
+			abi: stakingManagerAbi,
+			functionName: 'rewardsBalanceOfAccount',
+			args: [address]
+		}) as bigint;
+		
+		console.log(`Received total rewards balance for user ${address}: ${balance.toString()}`);
+		totalRewardsBalance.set(balance);
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch total rewards balance for user ${address}:`, error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			stakingManagerAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		totalRewardsBalance.set(0n);
+		return 0n;
+	}
+}
+
+// Function to fetch rewards balance for all vaults
+export async function fetchAllVaultRewardsBalances(vaults: readonly Address[]) {
+	console.log(`Fetching rewards balance for ${vaults.length} vaults`);
+	
+	try {
+		const balances = await Promise.all(vaults.map(fetchVaultRewardsBalance));
+		
+		const balancesMap = vaults.reduce(
+			(acc, vault, i) => {
+				acc[vault] = balances[i];
+				return acc;
+			},
+			{} as Record<Address, bigint>
+		);
+		
+		console.log(`Successfully fetched rewards balance for ${Object.keys(balancesMap).length} vaults`);
+		rewardsBalance.set(balancesMap);
+		return balancesMap;
+	} catch (error) {
+		console.error('Failed to fetch all vault rewards balances:', error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		return {};
 	}
 }

@@ -42,5 +42,19 @@ export const stakingManagerAbi = [
     ],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'vaultAddress', type: 'address' }],
+    name: 'rewardsBalanceOf',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    name: 'rewardsBalanceOfAccount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const; 
