@@ -91,21 +91,23 @@ export const formattedSntBalance = derived(sntBalance, ($balance) => {
 
 // Contract addresses
 export const STAKING_MANAGER = {
-	address: '0xd302bd9f60c5192e46258028a2f3b4b2b846f61f' as Address
+	address: '0x223532449d4cceBD432043aDb1CA0af642A2b3e0' as Address
 } as const;
 
 export const VAULT_FACTORY = {
-	address: '0xef5EDC2C16413EFAfB1d8e5F2e4a25b16eb7480d' as Address
+	address: '0x899da2e9f6C8fbA95d9F1dD5a0C984F2435ab8e0' as Address
 } as const;
 
 // Add Account type
 type Account = {
 	stakedBalance: bigint;
-	accountRewardIndex: bigint;
+	rewardIndex: bigint;
 	mpAccrued: bigint;
 	maxMP: bigint;
 	lastMPUpdateTime: bigint;
 	lockUntil: bigint;
+	mpStaked: bigint;
+	rewardsAccrued: bigint;
 };
 
 // Stores for staking data
@@ -176,7 +178,7 @@ async function fetchVaultAccount(vaultAddress: Address) {
 		const account = await publicClient.readContract({
 			address: STAKING_MANAGER.address,
 			abi: stakingManagerAbi,
-			functionName: 'getAccount',
+			functionName: 'getVault',
 			args: [vaultAddress]
 		});
 		return account;
@@ -214,7 +216,7 @@ async function fetchUserVaults(address: Address) {
 		const vaults = await publicClient.readContract({
 			address: STAKING_MANAGER.address,
 			abi: stakingManagerAbi,
-			functionName: 'getUserVaults',
+			functionName: 'getAccountVaults',
 			args: [address]
 		});
 		console.log('Received vaults:', vaults);
@@ -352,39 +354,6 @@ export async function deployVault() {
 	console.log('Vault deployment receipt:', receipt);
 
 	// Refresh both vaults and balances after deployment since gas was spent
-	await Promise.all([fetchUserVaults(address), refreshBalances(address)]);
-
-	return { hash, receipt };
-}
-
-// Function to register a vault
-export async function registerVault(vaultAddress: Address) {
-	const address = get(walletAddress);
-	const client = get(walletClient);
-
-	if (!address || !client) {
-		throw new Error('Wallet not connected');
-	}
-
-	console.log('Registering vault:', vaultAddress);
-
-	const hash = await client.writeContract({
-		chain: sepolia,
-		account: address,
-		address: vaultAddress,
-		abi: vaultAbi,
-		functionName: 'register'
-	});
-
-	console.log('Vault registration transaction hash:', hash);
-
-	const receipt = await publicClient.waitForTransactionReceipt({
-		hash,
-		confirmations: 1
-	});
-	console.log('Vault registration receipt:', receipt);
-
-	// Refresh both vaults and balances after registration since gas was spent
 	await Promise.all([fetchUserVaults(address), refreshBalances(address)]);
 
 	return { hash, receipt };
