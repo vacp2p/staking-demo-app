@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { walletAddress, SNT_TOKEN, userVaults, vaultAccounts } from '$lib/viem';
+	import { walletAddress, SNT_TOKEN, userVaults, vaultAccounts, rewardsBalance, formattedTotalRewardsBalance } from '$lib/viem';
 	import { formatUnits, type Address } from 'viem';
 	import UnstakingModal from '$lib/components/UnstakingModal.svelte';
 	import { goto } from '$app/navigation';
+	import { openAddressExplorer } from '$lib/utils';
 
 	let isUnstakingModalOpen = false;
 	let selectedVaultAddress: Address | undefined;
@@ -13,11 +14,15 @@
 	}
 
 	function openEtherscan(address: string) {
-		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+		openAddressExplorer(address as Address);
 	}
 
 	function formatAmount(amount: bigint): string {
 		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+	}
+
+	function formatRewardsAmount(amount: bigint): string {
+		return Number(formatUnits(amount, 18)).toFixed(2);
 	}
 
 	function handleUnstake(vault: Address, vaultId: number) {
@@ -122,6 +127,9 @@
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
 									Remaining Lock
 								</th>
+								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+									Karma Rewards
+								</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>
 								</th>
@@ -219,6 +227,11 @@
 										{:else}
 											{formatRemainingLock(vault)}
 										{/if}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-900">
+										{$rewardsBalance[vault] 
+											? formatRewardsAmount($rewardsBalance[vault])
+											: '0.00'} KARMA
 									</td>
 									<td
 										class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
@@ -374,6 +387,14 @@
 										{:else}
 											{formatRemainingLock(vault)}
 										{/if}
+									</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-sm text-gray-500">Karma Rewards</span>
+									<span class="text-sm font-medium text-gray-900">
+										{$rewardsBalance[vault] 
+											? formatRewardsAmount($rewardsBalance[vault])
+											: '0.00'} KARMA
 									</span>
 								</div>
 							</div>
