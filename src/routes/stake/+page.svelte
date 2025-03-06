@@ -483,7 +483,7 @@
 											type="range"
 											min={MIN_LOCK_DAYS}
 											max="1460"
-											step="1"
+											step="any"
 											bind:value={lockDurationDays}
 											class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
 										/>
@@ -513,7 +513,7 @@
 															lockDurationDays = Math.round(years * 365);
 														}
 													}}
-													step="0.25"
+													step="any"
 													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
 												/>
@@ -531,6 +531,7 @@
 													bind:value={lockDurationDays}
 													min={MIN_LOCK_DAYS}
 													max="1460"
+													step="any"
 													class="block w-full rounded-lg border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
 													placeholder="0"
 												/>
