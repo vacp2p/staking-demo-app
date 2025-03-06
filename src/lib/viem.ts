@@ -41,7 +41,7 @@ export const statusNetworkTestnet = {
 } as const satisfies Chain;
 
 // Create a store to track the current chain
-export const currentChain = writable<Chain>(sepolia);
+export const currentChain = writable<Chain>(statusNetworkTestnet);
 
 // Network information derived from current chain
 export const network = derived(currentChain, $chain => ({
@@ -52,20 +52,13 @@ export const network = derived(currentChain, $chain => ({
 
 // Create a client for reading from the blockchain - not derived to avoid type issues
 export const publicClient = createPublicClient({
-	chain: sepolia,
-	transport: http(rpcUrl)
+	chain: statusNetworkTestnet,
+	transport: http(statusNetworkTestnet.rpcUrls.default.http[0])
 });
 
-// Function to switch chains
-export function switchChain(chain: Chain) {
-	currentChain.set(chain);
-	// Update the public client when chain changes
-	// This is a simplified approach - in a real app, you'd want to handle this more robustly
-}
-
-// Token information
+// Token information for Status Network Testnet
 export const SNT_TOKEN = {
-	address: '0xE452027cdEF746c7Cd3DB31CB700428b16cD8E51' as Address,
+	address: '0x1C3Ac2a186c6149Ae7Cb4D716eBbD0766E4f898a' as Address,
 	name: 'Status Test Token',
 	symbol: 'STT',
 	decimals: 18
@@ -89,13 +82,13 @@ export const formattedSntBalance = derived(sntBalance, ($balance) => {
 	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
 });
 
-// Contract addresses
+// Contract addresses for Status Network Testnet
 export const STAKING_MANAGER = {
-	address: '0x223532449d4cceBD432043aDb1CA0af642A2b3e0' as Address
+	address: '0x785e6c5af58FB26F4a0E43e0cF254af10EaEe0f1' as Address
 } as const;
 
 export const VAULT_FACTORY = {
-	address: '0x899da2e9f6C8fbA95d9F1dD5a0C984F2435ab8e0' as Address
+	address: '0xf7b6EC76aCa97b395dc48f7A2861aD810B34b52e' as Address
 } as const;
 
 // Add Account type
@@ -280,40 +273,69 @@ export async function connectWallet() {
 		throw new Error('MetaMask not installed');
 	}
 
-	const accounts = (await window.ethereum.request({
-		method: 'eth_requestAccounts'
-	})) as string[];
-
-	const address = accounts[0] as Address;
-	console.log('Connected to address:', address);
-
-	const client = createWalletClient({
-		chain: sepolia,
-		transport: custom(window.ethereum)
-	});
-
-	walletAddress.set(address);
-	walletClient.set(client);
-
-	// Fetch initial balances and vaults
-	await Promise.all([fetchBalance(address), fetchSntBalance(address), fetchUserVaults(address)]);
-
-	// Listen for account changes
-	window.ethereum.on('accountsChanged', async (newAccounts: string[]) => {
-		if (newAccounts.length === 0) {
-			disconnectWallet();
-		} else {
-			const newAddress = newAccounts[0] as Address;
-			walletAddress.set(newAddress);
-			await Promise.all([
-				fetchBalance(newAddress),
-				fetchSntBalance(newAddress),
-				fetchUserVaults(newAddress)
-			]);
+	try {
+		// First, try to add or switch to the Status Network Testnet
+		try {
+			await window.ethereum.request({
+				method: 'wallet_switchEthereumChain',
+				params: [{ chainId: `0x${statusNetworkTestnet.id.toString(16)}` }]
+			});
+		} catch (switchError: any) {
+			// This error code indicates that the chain has not been added to MetaMask
+			if (switchError.code === 4902) {
+				await window.ethereum.request({
+					method: 'wallet_addEthereumChain',
+					params: [
+						{
+							chainId: `0x${statusNetworkTestnet.id.toString(16)}`,
+							chainName: statusNetworkTestnet.name,
+							nativeCurrency: statusNetworkTestnet.nativeCurrency,
+							rpcUrls: [statusNetworkTestnet.rpcUrls.default.http[0]],
+							blockExplorerUrls: [statusNetworkTestnet.blockExplorers?.default.url]
+						}
+					]
+				});
+			} else {
+				console.warn('Failed to switch to Status Network Testnet:', switchError);
+				// Continue anyway, as we'll use the Status Network contracts regardless
+			}
 		}
-	});
 
-	return { address, client };
+		const accounts = (await window.ethereum.request({
+			method: 'eth_requestAccounts'
+		})) as string[];
+
+		const address = accounts[0] as Address;
+		console.log('Connected to address:', address);
+		console.log('Using Status Network Testnet');
+
+		const client = createWalletClient({
+			chain: statusNetworkTestnet,
+			transport: custom(window.ethereum)
+		});
+
+		walletAddress.set(address);
+		walletClient.set(client);
+
+		// Fetch initial balances and vaults
+		await refreshBalances(address);
+
+		// Listen for account changes
+		window.ethereum.on('accountsChanged', async (newAccounts: string[]) => {
+			if (newAccounts.length === 0) {
+				disconnectWallet();
+			} else {
+				const newAddress = newAccounts[0] as Address;
+				walletAddress.set(newAddress);
+				await refreshBalances(newAddress);
+			}
+		});
+
+		return { address, client };
+	} catch (error) {
+		console.error('Error connecting wallet:', error);
+		throw error;
+	}
 }
 
 // Function to disconnect wallet
@@ -333,30 +355,47 @@ export function disconnectWallet() {
 export async function deployVault() {
 	const address = get(walletAddress);
 	const client = get(walletClient);
+	const chain = get(currentChain);
 
 	if (!address || !client) {
 		throw new Error('Wallet not connected');
 	}
 
-	console.log('Deploying new vault...');
+	console.log(`Deploying new vault on chain: ${chain.name} (${chain.id})`);
+	console.log(`Using VaultFactory address: ${VAULT_FACTORY.address}`);
 
-	const hash = await client.writeContract({
-		chain: sepolia,
-		account: address,
-		address: VAULT_FACTORY.address,
-		abi: vaultFactoryAbi,
-		functionName: 'createVault'
-	});
+	try {
+		const hash = await client.writeContract({
+			chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
+			account: address,
+			address: VAULT_FACTORY.address,
+			abi: vaultFactoryAbi,
+			functionName: 'createVault'
+		});
 
-	console.log('Vault deployment transaction hash:', hash);
+		console.log('Vault deployment transaction hash:', hash);
 
-	const receipt = await publicClient.waitForTransactionReceipt({ hash });
-	console.log('Vault deployment receipt:', receipt);
+		const receipt = await publicClient.waitForTransactionReceipt({ 
+			hash,
+			timeout: 60_000, // 60 second timeout
+			confirmations: 1
+		});
+		
+		console.log('Vault deployment receipt:', receipt);
 
-	// Refresh both vaults and balances after deployment since gas was spent
-	await Promise.all([fetchUserVaults(address), refreshBalances(address)]);
+		// Refresh both vaults and balances after deployment since gas was spent
+		await refreshBalances(address);
 
-	return { hash, receipt };
+		return { hash, receipt };
+	} catch (error) {
+		console.error('Error deploying vault:', error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			vaultFactoryAddress: VAULT_FACTORY.address,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		throw error;
+	}
 }
 
 // Function to stake tokens
@@ -373,100 +412,115 @@ export async function stakeTokens(
 ) {
 	const address = get(walletAddress);
 	const client = get(walletClient);
+	const chain = get(currentChain);
 
 	if (!address || !client) {
 		throw new Error('Wallet not connected');
 	}
 
-	console.log('Staking tokens:', { vaultAddress, amount: amount.toString() });
+	console.log(`Staking tokens on chain: ${chain.name} (${chain.id})`);
+	console.log(`Vault: ${vaultAddress}, Amount: ${amount.toString()}`);
+	console.log(`Using SNT Token address: ${SNT_TOKEN.address}`);
 
-	// First check current allowance
-	const currentAllowance = await publicClient.readContract({
-		address: SNT_TOKEN.address,
-		abi: tokenAbi,
-		functionName: 'allowance',
-		args: [address, vaultAddress]
-	});
+	try {
+		// First check current allowance
+		const currentAllowance = await publicClient.readContract({
+			address: SNT_TOKEN.address,
+			abi: tokenAbi,
+			functionName: 'allowance',
+			args: [address, vaultAddress]
+		});
 
-	console.log('Current allowance:', currentAllowance.toString());
-	let approvalHash: `0x${string}` | undefined;
-	let allowanceWasSet = false;
+		console.log('Current allowance:', currentAllowance.toString());
+		let approvalHash: `0x${string}` | undefined;
+		let allowanceWasSet = false;
 
-	// Only approve if the current allowance is less than the amount we want to stake
-	if (currentAllowance < amount) {
-		console.log('Approving tokens...');
+		// Only approve if the current allowance is less than the amount we want to stake
+		if (currentAllowance < amount) {
+			console.log('Approving tokens...');
 
-		// If there's an existing non-zero allowance, we need to reset it first
-		if (currentAllowance > 0n) {
-			console.log('Resetting existing allowance to 0...');
+			// If there's an existing non-zero allowance, we need to reset it first
+			if (currentAllowance > 0n) {
+				console.log('Resetting existing allowance to 0...');
+				approvalHash = await client.writeContract({
+					chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
+					account: address,
+					address: SNT_TOKEN.address,
+					abi: tokenAbi,
+					functionName: 'approve',
+					args: [vaultAddress, 0n]
+				});
+
+				console.log('Reset allowance transaction hash:', approvalHash);
+				callbacks?.onApprovalSubmitted?.(approvalHash);
+
+				const resetReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+				if (resetReceipt.status !== 'success') {
+					throw new Error('Reset allowance transaction failed');
+				}
+			}
+
+			// Now set the new allowance
 			approvalHash = await client.writeContract({
-				chain: sepolia,
+				chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
 				account: address,
 				address: SNT_TOKEN.address,
 				abi: tokenAbi,
 				functionName: 'approve',
-				args: [vaultAddress, 0n]
+				args: [vaultAddress, amount]
 			});
 
-			console.log('Reset allowance transaction hash:', approvalHash);
+			console.log('Token approval transaction hash:', approvalHash);
 			callbacks?.onApprovalSubmitted?.(approvalHash);
 
-			const resetReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-			if (resetReceipt.status !== 'success') {
-				throw new Error('Reset allowance transaction failed');
+			const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+			if (approvalReceipt.status !== 'success') {
+				throw new Error('Approval transaction failed');
 			}
+			callbacks?.onApprovalConfirmed?.();
+		} else {
+			console.log('Sufficient allowance already exists');
+			allowanceWasSet = true;
+			callbacks?.onAllowanceAlreadySet?.();
 		}
 
-		// Now set the new allowance
-		approvalHash = await client.writeContract({
-			chain: sepolia,
+		// Then stake the tokens
+		const stakingHash = await client.writeContract({
+			chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
 			account: address,
-			address: SNT_TOKEN.address,
-			abi: tokenAbi,
-			functionName: 'approve',
-			args: [vaultAddress, amount]
+			address: vaultAddress,
+			abi: vaultAbi,
+			functionName: 'stake',
+			args: [amount, 0n] // 0 seconds lock period
 		});
 
-		console.log('Token approval transaction hash:', approvalHash);
-		callbacks?.onApprovalSubmitted?.(approvalHash);
+		console.log('Staking transaction hash:', stakingHash);
+		callbacks?.onStakingSubmitted?.(stakingHash);
 
-		const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-		if (approvalReceipt.status !== 'success') {
-			throw new Error('Approval transaction failed');
+		const receipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
+		console.log('Staking receipt:', receipt);
+
+		if (receipt.status !== 'success') {
+			throw new Error('Staking transaction failed');
 		}
-		callbacks?.onApprovalConfirmed?.();
-	} else {
-		console.log('Sufficient allowance already exists');
-		allowanceWasSet = true;
-		callbacks?.onAllowanceAlreadySet?.();
+
+		callbacks?.onStakingConfirmed?.();
+
+		// Refresh balances and vault data
+		await refreshBalances(address);
+
+		return { approvalHash, stakingHash, allowanceWasSet };
+	} catch (error) {
+		console.error('Error staking tokens:', error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			vaultAddress,
+			sntTokenAddress: SNT_TOKEN.address,
+			amount: amount.toString(),
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		throw error;
 	}
-
-	// Then stake the tokens
-	const stakingHash = await client.writeContract({
-		chain: sepolia,
-		account: address,
-		address: vaultAddress,
-		abi: vaultAbi,
-		functionName: 'stake',
-		args: [amount, 0n] // 0 seconds lock period
-	});
-
-	console.log('Staking transaction hash:', stakingHash);
-	callbacks?.onStakingSubmitted?.(stakingHash);
-
-	const receipt = await publicClient.waitForTransactionReceipt({ hash: stakingHash });
-	console.log('Staking receipt:', receipt);
-
-	if (receipt.status !== 'success') {
-		throw new Error('Staking transaction failed');
-	}
-
-	callbacks?.onStakingConfirmed?.();
-
-	// Refresh balances and vault data
-	await refreshBalances(address);
-
-	return { approvalHash, hash: stakingHash, receipt, allowanceWasSet };
 }
 
 function formatAmount(amount: bigint): string {
@@ -483,33 +537,46 @@ export { fetchTotalStaked, fetchTokenPrice };
 export async function lockVault(vaultAddress: Address, lockDurationSeconds: number) {
 	const address = get(walletAddress);
 	const client = get(walletClient);
+	const chain = get(currentChain);
 
 	if (!address || !client) {
 		throw new Error('Wallet not connected');
 	}
 
-	console.log('Locking vault:', { vaultAddress, lockDurationSeconds });
+	console.log(`Locking vault on chain: ${chain.name} (${chain.id})`);
+	console.log(`Vault: ${vaultAddress}, Lock duration: ${lockDurationSeconds} seconds`);
 
-	const lockHash = await client.writeContract({
-		chain: sepolia,
-		account: address,
-		address: vaultAddress,
-		abi: vaultAbi,
-		functionName: 'lock',
-		args: [BigInt(lockDurationSeconds)]
-	});
+	try {
+		const lockHash = await client.writeContract({
+			chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
+			account: address,
+			address: vaultAddress,
+			abi: vaultAbi,
+			functionName: 'lock',
+			args: [BigInt(lockDurationSeconds)]
+		});
 
-	console.log('Lock transaction hash:', lockHash);
+		console.log('Lock transaction hash:', lockHash);
 
-	const receipt = await publicClient.waitForTransactionReceipt({ hash: lockHash });
-	console.log('Lock receipt:', receipt);
+		const receipt = await publicClient.waitForTransactionReceipt({ hash: lockHash });
+		console.log('Lock receipt:', receipt);
 
-	if (receipt.status !== 'success') {
-		throw new Error('Lock transaction failed');
+		if (receipt.status !== 'success') {
+			throw new Error('Lock transaction failed');
+		}
+
+		// Refresh vault data
+		await refreshBalances(address);
+
+		return lockHash;
+	} catch (error) {
+		console.error('Error locking vault:', error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			vaultAddress,
+			lockDurationSeconds,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		throw error;
 	}
-
-	// Refresh vault data
-	await fetchUserVaults(address);
-
-	return lockHash;
 }
