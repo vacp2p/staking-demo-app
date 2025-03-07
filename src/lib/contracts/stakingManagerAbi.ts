@@ -21,6 +21,13 @@ export const stakingManagerAbi = [
     type: 'function'
   },
   {
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    name: 'mpBalanceOfAccount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     inputs: [{ internalType: 'address', name: 'vaultAddress', type: 'address' }],
     name: 'getVault',
     outputs: [
@@ -55,6 +62,13 @@ export const stakingManagerAbi = [
     name: 'rewardsBalanceOfAccount',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'vaultAddress', type: 'address' }],
+    name: 'compound',
+    outputs: [],
+    stateMutability: 'nonpayable',
     type: 'function'
   }
 ] as const; 
