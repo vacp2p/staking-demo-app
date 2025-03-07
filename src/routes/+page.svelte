@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, SNT_TOKEN, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances } from '$lib/viem';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatUnits } from 'viem';
@@ -18,6 +18,20 @@
 
 	// Calculate the earliest unlock time across all vaults
 	$: firstUnlockTime = calculateFirstUnlockTime($userVaults, $vaultAccounts);
+
+	// Track compound transaction states
+	let compoundingVaults: Record<Address, 'idle' | 'loading' | 'success'> = {};
+	
+	// Initialize compounding state for all vaults
+	$: {
+		if ($userVaults.length > 0) {
+			$userVaults.forEach(vault => {
+				if (!compoundingVaults[vault]) {
+					compoundingVaults[vault] = 'idle';
+				}
+			});
+		}
+	}
 
 	function calculateFirstUnlockTime(vaults: Address[], accounts: Record<Address, any>): string {
 		if (!vaults || vaults.length === 0) {
@@ -120,6 +134,33 @@
 		return `${minutes}m`;
 	}
 
+	async function handleCompound(vault: Address) {
+		try {
+			// Set loading state
+			compoundingVaults[vault] = 'loading';
+			
+			// Trigger compound transaction
+			await compoundMPs(vault);
+			
+			// Set success state
+			compoundingVaults[vault] = 'success';
+			
+			// Refresh balances to update UI
+			if ($walletAddress) {
+				await refreshBalances($walletAddress);
+			}
+			
+			// Reset to idle after 3 seconds
+			setTimeout(() => {
+				compoundingVaults[vault] = 'idle';
+			}, 3000);
+		} catch (error) {
+			console.error("Error compounding MPs:", error);
+			// Reset to idle state on error
+			compoundingVaults[vault] = 'idle';
+		}
+	}
+
 	// Fetch data when navigating to overview page
 	$: if ($page.url.pathname === '/') {
 		fetchTotalStaked();
@@ -138,7 +179,7 @@
 			<!-- First row -->
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				{#if $userVaults.length > 0}
-					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
 						<div class="flex flex-col">
 							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Total Staked</h3>
 							<div class="mt-4 flex items-baseline justify-end gap-x-2">
@@ -150,19 +191,33 @@
 						</div>
 					</div>
 
-					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+					<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
 						<div class="flex flex-col">
 							<h3 class="text-sm font-medium leading-6 text-gray-500">Your Multiplier Points</h3>
+							<div class="mt-4 flex flex-col gap-1">
+								<div class="flex items-baseline justify-end gap-x-2">
+									<span class="text-4xl font-bold tracking-tight text-gray-900">
+										{$formattedTotalMpBalance}
+									</span>
+									<span class="text-sm font-semibold leading-6 text-gray-500">MPs</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="overflow-hidden rounded-xl bg-amber-50 p-6 shadow-sm">
+						<div class="flex flex-col">
+							<h3 class="text-sm font-medium leading-6 text-amber-700">MPs to Compound</h3>
 							<div class="mt-4 flex items-baseline justify-end gap-x-2">
-								<span class="text-4xl font-bold tracking-tight text-gray-900">
-									{$formattedTotalMpBalance}
+								<span class="text-4xl font-bold tracking-tight text-amber-900">
+									{$formattedUncompoundedMpTotal}
 								</span>
-								<span class="text-sm font-semibold leading-6 text-gray-500">MPs</span>
+								<span class="text-sm font-semibold leading-6 text-amber-700">MPs</span>
 							</div>
 						</div>
 					</div>
 				{:else}
-					<div class="col-span-2 overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm ring-1 ring-blue-900/5">
+					<div class="col-span-3 overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm">
 						<button
 							class="flex h-full w-full flex-col items-center justify-center gap-2"
 							on:click={handleStartStaking}
@@ -172,8 +227,34 @@
 						</button>
 					</div>
 				{/if}
+			</div>
 
-				<div class="overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm ring-1 ring-blue-900/5">
+			<!-- Second row -->
+			<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Total SNT Staked</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								{$formattedGlobalTotalStaked}
+							</span>
+							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
+					<div class="flex flex-col">
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
+						<div class="mt-4 flex items-baseline justify-end gap-x-2">
+							<span class="text-4xl font-bold tracking-tight text-gray-900">
+								{$userVaults.length}
+							</span>
+						</div>
+					</div>
+				</div>
+				
+				<div class="overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm">
 					<div class="flex flex-col">
 						<h3 class="text-sm font-medium leading-6 text-blue-700">Your Karma Rewards</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
@@ -186,57 +267,20 @@
 				</div>
 			</div>
 
-			<!-- Second row -->
-			<div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Total SNT Staked</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{$formattedGlobalTotalStaked}
-							</span>
-							<span class="text-sm font-semibold leading-6 text-gray-500">{SNT_TOKEN.symbol}</span>
-						</div>
-					</div>
-				</div>
-
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{$userVaults.length}
-							</span>
-						</div>
-					</div>
-				</div>
-				
-				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
-					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">First Unlock in</h3>
-						<div class="mt-4 flex items-baseline justify-end gap-x-2">
-							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{firstUnlockTime}
-							</span>
-						</div>
-					</div>
-				</div>
-			</div>
-
 			{#if $userVaults.length > 0}
 				<div class="mt-8">
 					<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
 
 					<!-- Table view (desktop) -->
 					<div class="mt-4 hidden sm:block">
-						<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
+						<div class="overflow-hidden rounded-xl bg-white shadow-sm">
 							<table class="min-w-full divide-y divide-gray-300">
 								<thead>
 									<tr>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Vault ID</th>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">MPs</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Earned MPs / Ready to Compound</th>
 										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Remaining Lock</th>
 										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Karma Rewards</th>
 										<th class="w-[52px]"></th>
@@ -271,7 +315,18 @@
 												{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
-												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
+												<div class="flex items-end justify-end">
+													<span>
+														{$vaultMpBalances[vault]
+															? formatAmount($vaultMpBalances[vault])
+															: '0.00'} / 
+													</span>
+													<span class="text-amber-700 ml-1">
+														{$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
+															? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
+															: '0.00'}
+													</span>
+												</div>
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
 												{#if isLocked(vault)}
@@ -288,23 +343,66 @@
 													{formatRemainingLock(vault)}
 												{/if}
 											</td>
-											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm font-bold text-blue-900">
 												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
 											</td>
 											<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-												{#if !isLocked(vault)}
+												<div class="flex items-center justify-end gap-2">
+													{#if !isLocked(vault)}
+														<button
+															on:click={() => handleStakeClick(vault)}
+															class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
+															aria-label="Add stake to vault"
+														>
+															<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+															</svg>
+														</button>
+													{:else}
+														<div class="w-8 h-8"></div>
+													{/if}
+													
+													<!-- Compound button with sync icon -->
 													<button
-														on:click={() => handleStakeClick(vault)}
-														class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100"
-														aria-label="Add stake to vault"
+														on:click={() => handleCompound(vault)}
+														class="rounded-full bg-blue-50 w-8 h-8 flex items-center justify-center text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-50"
+														disabled={compoundingVaults[vault] === 'loading' || 
+															!$vaultMpBalances[vault] || 
+															$vaultMpBalances[vault] <= ($vaultAccounts[vault]?.mpStaked || 0n)}
+														aria-label="Compound MPs"
+														title="Compound {$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
+															? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
+															: '0.00'} MPs"
 													>
-														<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-															<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-														</svg>
+														{#if compoundingVaults[vault] === 'loading'}
+															<!-- Loading spinner -->
+															<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+																<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+																<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+															</svg>
+														{:else if compoundingVaults[vault] === 'success'}
+															<!-- Success checkmark -->
+															<svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+																<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+															</svg>
+														{:else}
+															<!-- Default sync icon -->
+															<svg 
+																class="h-4 w-4" 
+																fill="none" 
+																viewBox="0 0 24 24" 
+																stroke-width="1.5" 
+																stroke="currentColor"
+															>
+																<path 
+																	stroke-linecap="round" 
+																	stroke-linejoin="round" 
+																	d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
+																/>
+															</svg>
+														{/if}
 													</button>
-												{:else}
-													<div class="w-8 h-8"></div>
-												{/if}
+												</div>
 											</td>
 										</tr>
 									{/each}
@@ -347,9 +445,20 @@
 										</div>
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">MPs</span>
-											<span class="text-sm font-medium text-gray-900">
-												{$vaultAccounts[vault]?.mpAccrued ? formatAmount($vaultAccounts[vault].mpAccrued) : '0.00'} MP
-											</span>
+											<div class="flex items-center">
+												<div class="flex items-end justify-end">
+													<span>
+														{$vaultMpBalances[vault]
+															? formatAmount($vaultMpBalances[vault])
+															: '0.00'} / 
+													</span>
+													<span class="text-amber-700 ml-1">
+														{$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
+															? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
+															: '0.00'}
+													</span>
+												</div>
+											</div>
 										</div>
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">Remaining Lock</span>
@@ -371,25 +480,70 @@
 										</div>
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">Karma Rewards</span>
-											<span class="text-sm font-medium text-gray-900">
+											<span class="text-sm font-bold text-blue-900">
 												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
 											</span>
 										</div>
 									</div>
 									<div class="mt-4">
-										{#if !isLocked(vault)}
-											<button
-												on:click={() => handleStakeClick(vault)}
-												class="w-full rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 flex items-center justify-center gap-2"
-											>
-												<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-												</svg>
-												Add Stake
-											</button>
-										{:else}
-											<div class="h-[36px]"></div>
-										{/if}
+										<div class="flex items-center gap-2">
+											<div class="flex items-center justify-end gap-2">
+												{#if !isLocked(vault)}
+													<button
+														on:click={() => handleStakeClick(vault)}
+														class="w-full rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 flex items-center justify-center gap-2"
+													>
+														<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+														</svg>
+														Add Stake
+													</button>
+												{:else}
+													<div class="h-[36px]"></div>
+												{/if}
+												
+												<!-- Compound button for mobile -->
+												<button
+													on:click={() => handleCompound(vault)}
+													class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-50"
+													disabled={compoundingVaults[vault] === 'loading' || 
+														!$vaultMpBalances[vault] || 
+														$vaultMpBalances[vault] <= ($vaultAccounts[vault]?.mpStaked || 0n)}
+													aria-label="Compound MPs"
+													title="Compound {$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
+														? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
+														: '0.00'} MPs"
+												>
+													{#if compoundingVaults[vault] === 'loading'}
+														<!-- Loading spinner -->
+														<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+															<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+															<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+														</svg>
+													{:else if compoundingVaults[vault] === 'success'}
+														<!-- Success checkmark -->
+														<svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+															<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+														</svg>
+													{:else}
+														<!-- Default sync icon -->
+														<svg 
+															class="h-4 w-4" 
+															fill="none" 
+															viewBox="0 0 24 24" 
+															stroke-width="1.5" 
+															stroke="currentColor"
+														>
+															<path 
+																stroke-linecap="round" 
+																stroke-linejoin="round" 
+																d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
+																/>
+															</svg>
+													{/if}
+												</button>
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -400,7 +554,7 @@
 		</div>
 	{:else}
 		<div class="mx-auto mt-16 max-w-2xl text-center">
-			<div class="rounded-xl bg-white p-8 shadow-sm ring-1 ring-gray-900/5">
+			<div class="rounded-xl bg-white p-8 shadow-sm">
 				<h3 class="text-sm font-semibold leading-7 text-gray-900">Connect Wallet</h3>
 				<p class="mt-2 text-sm leading-6 text-gray-500">Connect your wallet to view your staking positions and rewards</p>
 			</div>

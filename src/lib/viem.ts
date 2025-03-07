@@ -108,12 +108,45 @@ export const userVaults = writable<Address[]>([]);
 export const vaultAccounts = writable<Record<Address, Account>>({});
 export const rewardsBalance = writable<Record<Address, bigint>>({});
 export const totalRewardsBalance = writable<bigint>(0n);
+export const totalMpAccountBalance = writable<bigint>(0n);
+export const vaultMpBalances = writable<Record<Address, bigint>>({});
+export const uncompoundedMpTotal = writable<bigint>(0n);
 
 export const totalMpBalance = derived(vaultAccounts, ($accounts) => {
 	return Object.values($accounts).reduce((sum, account) => sum + account.mpAccrued, 0n);
 });
 
-export const formattedTotalMpBalance = derived(totalMpBalance, ($total) => {
+// Add stores for staked and unstaked MP balances
+export const stakedMpBalance = derived(vaultAccounts, ($accounts) => {
+	return Object.values($accounts).reduce((sum, account) => sum + (account.mpStaked || 0n), 0n);
+});
+
+export const unstakedMpBalance = derived(
+	[totalMpAccountBalance, stakedMpBalance], 
+	([$total, $staked]) => {
+		return $total > $staked ? $total - $staked : 0n;
+	}
+);
+
+export const formattedTotalMpBalance = derived(totalMpAccountBalance, ($total) => {
+	if ($total === undefined) return '0.00';
+	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+export const formattedTotalMpAccountBalance = derived(totalMpAccountBalance, ($total) => {
+	if ($total === undefined) return '0.00';
+	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+export const formattedStakedMpBalance = derived(stakedMpBalance, ($balance) => {
+	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+export const formattedUnstakedMpBalance = derived(unstakedMpBalance, ($balance) => {
+	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
+});
+
+export const formattedUncompoundedMpTotal = derived(uncompoundedMpTotal, ($total) => {
 	if ($total === undefined) return '0.00';
 	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
 });
@@ -299,7 +332,9 @@ export async function refreshBalances(address: Address) {
 			fetchSntBalance(address),
 			fetchTotalStaked(),
 			fetchTotalRewardsBalance(address),
-			fetchAllVaultRewardsBalances(vaults)
+			fetchAllVaultRewardsBalances(vaults),
+			mpBalanceOfAccount(address),
+			fetchAllVaultMpBalances(vaults)
 		]);
 		
 		// Log results
@@ -308,7 +343,9 @@ export async function refreshBalances(address: Address) {
 							  index === 1 ? 'STT balance' : 
 							  index === 2 ? 'Total staked' : 
 							  index === 3 ? 'Total rewards' :
-							  'Vault rewards';
+							  index === 4 ? 'Vault rewards' :
+							  index === 5 ? 'Total MP balance' :
+							  'Vault MP balances';
 							  
 			if (result.status === 'fulfilled') {
 				console.log(`✅ Successfully refreshed ${operation}`);
@@ -668,6 +705,114 @@ async function fetchVaultRewardsBalance(vaultAddress: Address) {
 	}
 }
 
+// Function to fetch MP balance for a specific vault
+export async function mpBalanceOf(vaultAddress: Address) {
+	const stakingManagerAddress = STAKING_MANAGER.address;
+	
+	try {
+		console.log(`Fetching MP balance for vault: ${vaultAddress}`);
+		console.log(`Using StakingManager address: ${stakingManagerAddress}`);
+		
+		const balance = await publicClient.readContract({
+			address: stakingManagerAddress,
+			abi: stakingManagerAbi,
+			functionName: 'mpBalanceOf',
+			args: [vaultAddress]
+		}) as bigint;
+		
+		console.log(`Received MP balance for vault ${vaultAddress}: ${balance.toString()}`);
+		
+		// Update the vault MP balance store
+		vaultMpBalances.update(balances => {
+			balances[vaultAddress] = balance;
+			return balances;
+		});
+		
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch MP balance for vault ${vaultAddress}:`, error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			stakingManagerAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		return 0n;
+	}
+}
+
+// Function to fetch MP balances for all vaults
+export async function fetchAllVaultMpBalances(vaults: readonly Address[]) {
+	console.log(`Fetching MP balances for ${vaults.length} vaults`);
+	
+	try {
+		const balances = await Promise.all(vaults.map(mpBalanceOf));
+		
+		const balancesMap = vaults.reduce(
+			(acc, vault, i) => {
+				acc[vault] = balances[i];
+				return acc;
+			},
+			{} as Record<Address, bigint>
+		);
+		
+		console.log(`Successfully fetched MP balances for ${Object.keys(balancesMap).length} vaults`);
+		vaultMpBalances.set(balancesMap);
+		
+		// Calculate total uncompounded MPs
+		const accounts = get(vaultAccounts);
+		let totalUncompounded = 0n;
+		
+		for (const vault of vaults) {
+			const mpBalance = balancesMap[vault] || 0n;
+			const mpStaked = accounts[vault]?.mpStaked || 0n;
+			if (mpBalance > mpStaked) {
+				totalUncompounded += (mpBalance - mpStaked);
+			}
+		}
+		
+		uncompoundedMpTotal.set(totalUncompounded);
+		
+		return balancesMap;
+	} catch (error) {
+		console.error('Failed to fetch all vault MP balances:', error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		return {};
+	}
+}
+
+// Function to fetch total MP balance for a user across all vaults
+export async function mpBalanceOfAccount(address: Address) {
+	const stakingManagerAddress = STAKING_MANAGER.address;
+	
+	try {
+		console.log(`Fetching total MP balance for user: ${address}`);
+		console.log(`Using StakingManager address: ${stakingManagerAddress}`);
+		
+		const balance = await publicClient.readContract({
+			address: stakingManagerAddress,
+			abi: stakingManagerAbi,
+			functionName: 'mpBalanceOfAccount',
+			args: [address]
+		}) as bigint;
+		
+		console.log(`Received total MP balance for user ${address}: ${balance.toString()}`);
+		totalMpAccountBalance.set(balance);
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch total MP balance for user ${address}:`, error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			stakingManagerAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		totalMpAccountBalance.set(0n);
+		return 0n;
+	}
+}
+
 // Function to fetch total rewards balance for a user across all vaults
 export async function fetchTotalRewardsBalance(address: Address) {
 	const chainId = get(currentChain).id;
@@ -724,5 +869,44 @@ export async function fetchAllVaultRewardsBalances(vaults: readonly Address[]) {
 			publicClient: publicClient ? 'Initialized' : 'Not initialized'
 		});
 		return {};
+	}
+}
+
+// Function to compound MPs
+export async function compoundMPs(vaultAddress: Address) {
+	try {
+		const client = get(walletClient);
+		const address = get(walletAddress);
+		const chain = get(currentChain);
+		
+		if (!client || !address) {
+			throw new Error('Wallet not connected');
+		}
+		
+		console.log(`Compounding MPs for vault: ${vaultAddress} on chain: ${chain.name} (${chain.id})`);
+		
+		// Call compound on the staking manager with the vault address as an argument
+		const hash = await client.writeContract({
+			chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
+			account: address,
+			address: STAKING_MANAGER.address,
+			abi: stakingManagerAbi,
+			functionName: 'compound',
+			args: [vaultAddress]
+		});
+		
+		console.log('Compound transaction hash:', hash);
+		
+		// Wait for transaction to be mined
+		const receipt = await publicClient.waitForTransactionReceipt({ hash });
+		console.log('Compound receipt:', receipt);
+		
+		// Refresh balances after compounding
+		await refreshBalances(address);
+		
+		return hash;
+	} catch (error) {
+		console.error("Error compounding MPs:", error);
+		throw error;
 	}
 }
