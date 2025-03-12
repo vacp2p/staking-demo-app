@@ -23,6 +23,65 @@
 		}
 	}
 
+	// Sorting state
+	type SortField = 'vaultId' | 'stakedAmount' | 'earnedMPs' | 'remainingLock' | 'karmaRewards';
+	type SortDirection = 'asc' | 'desc';
+	
+	let sortField: SortField = 'vaultId';
+	let sortDirection: SortDirection = 'asc';
+	
+	// Function to handle sort changes
+	function handleSort(field: SortField) {
+		if (sortField === field) {
+			// Toggle direction if clicking the same field
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			// Set new field and default to ascending
+			sortField = field;
+			sortDirection = 'asc';
+		}
+	}
+	
+	// Function to get sort indicator
+	function getSortIndicator(field: SortField): { visible: boolean, direction: SortDirection } {
+		if (sortField !== field) return { visible: false, direction: 'asc' };
+		return { visible: true, direction: sortDirection };
+	}
+	
+	// Computed sorted vaults
+	$: sortedVaults = [...$userVaults].sort((a, b) => {
+		const multiplier = sortDirection === 'asc' ? 1 : -1;
+		
+		switch (sortField) {
+			case 'vaultId':
+				// Sort by index in the array
+				return multiplier * ($userVaults.indexOf(a) - $userVaults.indexOf(b));
+			
+			case 'stakedAmount':
+				const aStaked = $vaultAccounts[a]?.stakedBalance || 0n;
+				const bStaked = $vaultAccounts[b]?.stakedBalance || 0n;
+				return multiplier * (aStaked > bStaked ? 1 : aStaked < bStaked ? -1 : 0);
+			
+			case 'earnedMPs':
+				const aEarned = $vaultMpBalances[a] || 0n;
+				const bEarned = $vaultMpBalances[b] || 0n;
+				return multiplier * (aEarned > bEarned ? 1 : aEarned < bEarned ? -1 : 0);
+			
+			case 'remainingLock':
+				const aLockUntil = $vaultAccounts[a]?.lockUntil || 0n;
+				const bLockUntil = $vaultAccounts[b]?.lockUntil || 0n;
+				return multiplier * (aLockUntil > bLockUntil ? 1 : aLockUntil < bLockUntil ? -1 : 0);
+			
+			case 'karmaRewards':
+				const aRewards = $rewardsBalance[a] || 0n;
+				const bRewards = $rewardsBalance[b] || 0n;
+				return multiplier * (aRewards > bRewards ? 1 : aRewards < bRewards ? -1 : 0);
+			
+			default:
+				return 0;
+		}
+	});
+
 	function shortenAddress(address: string): string {
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	}
@@ -149,27 +208,119 @@
 							<tr>
 								<th
 									scope="col"
-									class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
+									class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+									on:click={() => handleSort('vaultId')}
 								>
-									Vault ID
+									<div class="flex items-center">
+										Vault ID
+										{#if getSortIndicator('vaultId').visible}
+											<span class="ml-1 text-blue-600">
+												{#if getSortIndicator('vaultId').direction === 'asc'}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+													</svg>
+												{:else}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+													</svg>
+												{/if}
+											</span>
+										{/if}
+									</div>
 								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
 									Address
 								</th>
-								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-									Staked Amount
+								<th 
+									scope="col" 
+									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+									on:click={() => handleSort('stakedAmount')}
+								>
+									<div class="flex items-center justify-end">
+										Staked Amount
+										{#if getSortIndicator('stakedAmount').visible}
+											<span class="ml-1 text-blue-600">
+												{#if getSortIndicator('stakedAmount').direction === 'asc'}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+													</svg>
+												{:else}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+													</svg>
+												{/if}
+											</span>
+										{/if}
+									</div>
 								</th>
-								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-									Earned MPs / Ready to Compound
+								<th 
+									scope="col" 
+									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+									on:click={() => handleSort('earnedMPs')}
+								>
+									<div class="flex items-center justify-end">
+										Earned MPs / Ready to Compound
+										{#if getSortIndicator('earnedMPs').visible}
+											<span class="ml-1 text-blue-600">
+												{#if getSortIndicator('earnedMPs').direction === 'asc'}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+													</svg>
+												{:else}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+													</svg>
+												{/if}
+											</span>
+										{/if}
+									</div>
 								</th>
 								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
 									Max MPs
 								</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-									Remaining Lock
+								<th 
+									scope="col" 
+									class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+									on:click={() => handleSort('remainingLock')}
+								>
+									<div class="flex items-center">
+										Remaining Lock
+										{#if getSortIndicator('remainingLock').visible}
+											<span class="ml-1 text-blue-600">
+												{#if getSortIndicator('remainingLock').direction === 'asc'}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+													</svg>
+												{:else}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+													</svg>
+												{/if}
+											</span>
+										{/if}
+									</div>
 								</th>
-								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-									Karma Rewards
+								<th 
+									scope="col" 
+									class="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+									on:click={() => handleSort('karmaRewards')}
+								>
+									<div class="flex items-center justify-end">
+										Karma Rewards
+										{#if getSortIndicator('karmaRewards').visible}
+											<span class="ml-1 text-blue-600">
+												{#if getSortIndicator('karmaRewards').direction === 'asc'}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+													</svg>
+												{:else}
+													<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+														<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+													</svg>
+												{/if}
+											</span>
+										{/if}
+									</div>
 								</th>
 								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 									<span class="sr-only">Actions</span>
@@ -177,7 +328,7 @@
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-gray-200 bg-white">
-							{#each $userVaults as vault, i}
+							{#each sortedVaults as vault, i}
 								<tr>
 									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6">
 										<div class="flex items-center gap-2">
@@ -221,7 +372,7 @@
 													</svg>
 												</button>
 											{/if}
-											#{i + 1}
+											#{$userVaults.indexOf(vault) + 1}
 										</div>
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
@@ -378,7 +529,41 @@
 
 			<!-- Card view (mobile) -->
 			<div class="mt-4 space-y-4 sm:hidden">
-				{#each $userVaults as vault, i}
+				<!-- Mobile sorting controls -->
+				<div class="mb-4 flex items-center justify-between">
+					<label for="mobile-sort" class="block text-sm font-medium text-gray-700">Sort by:</label>
+					<div class="flex items-center">
+						<select 
+							id="mobile-sort" 
+							class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+							bind:value={sortField}
+							on:change={() => sortDirection = 'asc'}
+						>
+							<option value="vaultId">Vault ID</option>
+							<option value="stakedAmount">Staked Amount</option>
+							<option value="earnedMPs">Earned MPs</option>
+							<option value="remainingLock">Remaining Lock</option>
+							<option value="karmaRewards">Karma Rewards</option>
+						</select>
+						<button 
+							class="ml-2 p-2 text-gray-500 hover:text-gray-700"
+							on:click={() => sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'}
+							aria-label={sortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'}
+						>
+							{#if sortDirection === 'asc'}
+								<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+								</svg>
+							{:else}
+								<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+								</svg>
+							{/if}
+						</button>
+					</div>
+				</div>
+				
+				{#each sortedVaults as vault, i}
 					<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
 						<div class="px-4 py-5">
 							<div class="flex items-center justify-between">
@@ -423,7 +608,7 @@
 											</svg>
 										</button>
 									{/if}
-									<h3 class="text-sm font-medium text-gray-900">Vault #{i + 1}</h3>
+									<h3 class="text-sm font-medium text-gray-900">Vault #{$userVaults.indexOf(vault) + 1}</h3>
 								</div>
 								<button
 									class="text-sm text-blue-600 hover:text-blue-900"
