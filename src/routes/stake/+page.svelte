@@ -82,7 +82,18 @@
 	}
 
 	function formatAmount(amount: bigint): string {
-		return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+		const num = Number(formatUnits(amount, SNT_TOKEN.decimals));
+		return formatNumberWithSpaces(num);
+	}
+
+	// Helper function to format numbers with spaces as thousand separators
+	function formatNumberWithSpaces(num: number): string {
+		// Format with 2 decimal places
+		const parts = num.toFixed(2).split('.');
+		// Add spaces for thousands in the integer part
+		parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+		// Join with decimal part
+		return parts.join('.');
 	}
 
 	function openAddressEtherscan(address: string) {

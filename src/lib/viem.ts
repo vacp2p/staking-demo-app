@@ -74,12 +74,14 @@ export const sntError = writable<string | undefined>(undefined);
 // Derived store for formatted balances
 export const formattedBalance = derived(walletBalance, ($balance) => {
 	if ($balance === undefined) return undefined;
-	return Number(formatEther($balance)).toFixed(4);
+	const num = Number(formatEther($balance));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedSntBalance = derived(sntBalance, ($balance) => {
 	if ($balance === undefined) return undefined;
-	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($balance, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 // Contract addresses for Status Network Testnet
@@ -130,39 +132,44 @@ export const unstakedMpBalance = derived(
 
 export const formattedTotalMpBalance = derived(totalMpAccountBalance, ($total) => {
 	if ($total === undefined) return '0.00';
-	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($total, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedTotalMpAccountBalance = derived(totalMpAccountBalance, ($total) => {
 	if ($total === undefined) return '0.00';
-	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($total, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedStakedMpBalance = derived(stakedMpBalance, ($balance) => {
-	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($balance, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedUnstakedMpBalance = derived(unstakedMpBalance, ($balance) => {
-	return Number(formatUnits($balance, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($balance, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedUncompoundedMpTotal = derived(uncompoundedMpTotal, ($total) => {
 	if ($total === undefined) return '0.00';
-	return Number(formatUnits($total, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits($total, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 export const formattedTotalRewardsBalance = derived(totalRewardsBalance, ($total) => {
 	if ($total === undefined) return '0.00';
-	return Number(formatUnits($total, 18)).toFixed(2);
+	const num = Number(formatUnits($total, 18));
+	return formatNumberWithSpaces(num);
 });
 
 // Add new store for total staked
 export const globalTotalStaked = writable<bigint>(0n);
 export const formattedGlobalTotalStaked = derived(globalTotalStaked, ($total) => {
 	if ($total === undefined) return '0';
-	return Number(formatUnits($total, SNT_TOKEN.decimals))
-		.toFixed(2)
-		.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+	const num = Number(formatUnits($total, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
 });
 
 // Add new store for token price
@@ -619,7 +626,18 @@ export async function stakeTokens(
 }
 
 function formatAmount(amount: bigint): string {
-	return Number(formatUnits(amount, SNT_TOKEN.decimals)).toFixed(2);
+	const num = Number(formatUnits(amount, SNT_TOKEN.decimals));
+	return formatNumberWithSpaces(num);
+}
+
+// Helper function to format numbers with spaces as thousand separators
+function formatNumberWithSpaces(num: number): string {
+	// Format with 2 decimal places
+	const parts = num.toFixed(2).split('.');
+	// Add spaces for thousands in the integer part
+	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+	// Join with decimal part
+	return parts.join('.');
 }
 
 // Initial fetch of total staked
