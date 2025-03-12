@@ -187,7 +187,7 @@
 
 <div class="mx-auto max-w-7xl px-6 lg:px-8">
 	{#if $walletAddress}
-		<div class="mx-auto mt-8 max-w-4xl">
+		<div class="mx-auto mt-8 max-w-full lg:max-w-4xl">
 			<!-- First row -->
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				{#if $userVaults.length > 0}
@@ -280,22 +280,27 @@
 			</div>
 
 			{#if $userVaults.length > 0}
-				<div class="mt-8">
+				<div class="mt-8 overflow-hidden">
 					<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
 
 					<!-- Table view (desktop) -->
 					<div class="mt-4 hidden sm:block">
-						<div class="overflow-hidden rounded-xl bg-white shadow-sm">
-							<table class="min-w-full divide-y divide-gray-300">
+						<div class="overflow-x-auto rounded-xl bg-white shadow-sm">
+							<table class="w-full divide-y divide-gray-300">
 								<thead>
 									<tr>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Vault ID</th>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Address</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">SNT Staked</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Earned MPs / Ready to Compound</th>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Remaining Lock</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Karma Rewards</th>
-										<th class="w-[52px]"></th>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[120px]">Vault ID</th>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Address</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">SNT Staked</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">
+											<div class="flex flex-col items-end">
+												<span>Earned MPs</span>
+												<span class="text-xs font-normal text-gray-500">Ready to Compound</span>
+											</div>
+										</th>
+										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Remaining Lock</th>
+										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">Karma Rewards</th>
+										<th class="w-[80px]"></th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-gray-200">
@@ -327,16 +332,16 @@
 												{$vaultAccounts[vault]?.stakedBalance ? formatAmount($vaultAccounts[vault].stakedBalance) : '0.00'} {SNT_TOKEN.symbol}
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900">
-												<div class="flex items-end justify-end">
-													<span>
+												<div class="flex flex-col items-end">
+													<span class="font-medium">
 														{$vaultMpBalances[vault]
 															? formatAmount($vaultMpBalances[vault])
-															: '0.00'} / 
+															: '0.00'} MPs
 													</span>
-													<span class="text-amber-700 ml-1">
+													<span class="text-xs text-amber-700">
 														{$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
 															? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
-															: '0.00'}
+															: '0.00'} MPs
 													</span>
 												</div>
 											</td>
@@ -356,7 +361,7 @@
 												{/if}
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm font-bold text-blue-900">
-												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
+												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'}
 											</td>
 											<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 												<div class="flex items-center justify-end gap-2">
@@ -410,8 +415,8 @@
 																	stroke-linecap="round" 
 																	stroke-linejoin="round" 
 																	d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" 
-																/>
-															</svg>
+																	/>
+																</svg>
 														{/if}
 													</button>
 												</div>
@@ -457,19 +462,17 @@
 										</div>
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">MPs</span>
-											<div class="flex items-center">
-												<div class="flex items-end justify-end">
-													<span>
-														{$vaultMpBalances[vault]
-															? formatAmount($vaultMpBalances[vault])
-															: '0.00'} / 
-													</span>
-													<span class="text-amber-700 ml-1">
-														{$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
-															? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
-															: '0.00'}
-													</span>
-												</div>
+											<div class="flex flex-col items-end">
+												<span class="text-sm font-medium text-gray-900">
+													{$vaultMpBalances[vault]
+														? formatAmount($vaultMpBalances[vault])
+														: '0.00'} MPs
+												</span>
+												<span class="text-xs text-amber-700">
+													Ready: {$vaultMpBalances[vault] > ($vaultAccounts[vault]?.mpStaked || 0n)
+														? formatAmount($vaultMpBalances[vault] - ($vaultAccounts[vault]?.mpStaked || 0n))
+														: '0.00'} MPs
+												</span>
 											</div>
 										</div>
 										<div class="flex justify-between">
@@ -493,7 +496,7 @@
 										<div class="flex justify-between">
 											<span class="text-sm text-gray-500">Karma Rewards</span>
 											<span class="text-sm font-bold text-blue-900">
-												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'} KARMA
+												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'}
 											</span>
 										</div>
 									</div>
