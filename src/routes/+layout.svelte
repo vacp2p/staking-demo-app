@@ -2,7 +2,16 @@
 	import { i18n } from '$lib/i18n';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 	import WalletConnect from '$lib/components/WalletConnect.svelte';
+	import { onMount } from 'svelte';
+	import { initializeWallet, isWalletInitialized } from '$lib/onboardToViem';
 	import '../app.css';
+	
+	// Initialize wallet connection on app load
+	onMount(() => {
+		if (!$isWalletInitialized) {
+			initializeWallet();
+		}
+	});
 </script>
 
 <ParaglideJS {i18n}>
