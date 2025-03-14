@@ -9,7 +9,8 @@
   type NftMetadata = {
     name: string;
     description: string;
-    image: string;
+    image_data?: string;
+    image?: string;
   };
   
   let isLoading = false;
@@ -17,6 +18,7 @@
   let nftMetadata: NftMetadata | null = null;
   let decodedSvg: string | null = null;
   let karmaBalance: string = '0';
+  let imageDataUrl: string | null = null;
   
   // Function to derive tokenID from wallet address
   function deriveTokenIdFromAddress(address: Address): bigint {
@@ -61,6 +63,7 @@
     nftMetadata = null;
     decodedSvg = null;
     karmaBalance = '0';
+    imageDataUrl = null;
     
     try {
       // Derive tokenID from address
@@ -74,22 +77,65 @@
         args: [tokenId]
       });
       
+      console.log('Raw tokenURI:', tokenUri);
+      
       // Parse data URI
       if (tokenUri.startsWith('data:application/json;base64,')) {
         const base64Data = tokenUri.replace('data:application/json;base64,', '');
         const jsonString = decodeBase64(base64Data);
+        console.log('Decoded metadata JSON:', jsonString);
+        
         const metadata = JSON.parse(jsonString) as NftMetadata;
         nftMetadata = metadata;
+        
+        console.log('Parsed metadata:', metadata);
         
         // Extract Karma balance from description
         if (metadata.description) {
           karmaBalance = extractKarmaBalance(metadata.description);
         }
         
-        // Decode SVG image if it's base64 encoded
-        if (metadata.image && metadata.image.startsWith('data:image/svg+xml;base64,')) {
-          const svgBase64 = metadata.image.replace('data:image/svg+xml;base64,', '');
-          decodedSvg = decodeBase64(svgBase64);
+        // Process image data - prioritize image_data (new format)
+        if (metadata.image_data) {
+          console.log('Found image_data:', metadata.image_data.substring(0, 100) + '...');
+          
+          if (metadata.image_data.startsWith('data:image/svg+xml;base64,')) {
+            // Base64 encoded SVG
+            const svgBase64 = metadata.image_data.replace('data:image/svg+xml;base64,', '');
+            decodedSvg = decodeBase64(svgBase64);
+            console.log('Decoded SVG from base64 image_data');
+          } else if (metadata.image_data.includes('<svg')) {
+            // Direct SVG content
+            decodedSvg = metadata.image_data;
+            console.log('Using image_data directly as SVG');
+          } else if (metadata.image_data.startsWith('data:')) {
+            // Other data URI format
+            imageDataUrl = metadata.image_data;
+            console.log('Using image_data as image source URL');
+          } else {
+            // Unknown format, try as SVG
+            decodedSvg = metadata.image_data;
+            console.log('Using image_data as SVG (unknown format)');
+          }
+        } 
+        // Fallback to image (old format)
+        else if (metadata.image) {
+          console.log('Found image:', metadata.image.substring(0, 100) + '...');
+          
+          if (metadata.image.startsWith('data:image/svg+xml;base64,')) {
+            // Base64 encoded SVG
+            const svgBase64 = metadata.image.replace('data:image/svg+xml;base64,', '');
+            decodedSvg = decodeBase64(svgBase64);
+            console.log('Decoded SVG from base64 image');
+          } else {
+            // Use as image URL
+            imageDataUrl = metadata.image;
+            console.log('Using image as image source URL');
+          }
+        }
+        
+        if (decodedSvg) {
+          console.log('Final SVG data:', decodedSvg.substring(0, 100) + '...');
         }
       } else {
         throw new Error('Unsupported token URI format');
@@ -147,15 +193,19 @@
             <!-- NFT Image (Left Side) -->
             <div class="bg-gray-50 p-4 rounded-lg flex items-center justify-center">
               {#if decodedSvg}
+                <!-- Render decoded SVG -->
                 <div class="w-full h-full flex items-center justify-center">
                   {@html decodedSvg}
                 </div>
-              {:else if nftMetadata.image}
-                <img 
-                  src={nftMetadata.image} 
-                  alt="KarmaNFT" 
-                  class="max-w-full max-h-64 object-contain"
-                />
+              {:else if imageDataUrl}
+                <!-- Render image from URL -->
+                <div class="w-full h-full flex items-center justify-center">
+                  <img 
+                    src={imageDataUrl} 
+                    alt="KarmaNFT" 
+                    class="max-w-full max-h-64 object-contain"
+                  />
+                </div>
               {:else}
                 <!-- Placeholder Image -->
                 <div class="w-full h-64 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
