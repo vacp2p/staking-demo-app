@@ -39,7 +39,6 @@ export const stakingManagerAbi = [
           { internalType: 'uint256', name: 'maxMP', type: 'uint256' },
           { internalType: 'uint256', name: 'lastMPUpdateTime', type: 'uint256' },
           { internalType: 'uint256', name: 'lockUntil', type: 'uint256' },
-          { internalType: 'uint256', name: 'mpStaked', type: 'uint256' },
           { internalType: 'uint256', name: 'rewardsAccrued', type: 'uint256' }
         ],
         internalType: 'struct RewardsStreamerMP.VaultData',
