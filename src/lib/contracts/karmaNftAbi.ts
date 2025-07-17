@@ -1,6 +1,6 @@
 import type { Address } from 'viem'
 
-export const KARMA_NFT_ADDRESS = '0xdE5592e1001f52380f9EDE01aa6725F469A8e46F' as const;
+export const KARMA_NFT_ADDRESS = '0xF47E1B12c60e9e356950ffA5680863ec2418bdCB' as const;
 
 export const karmaNftAbi = [
     {

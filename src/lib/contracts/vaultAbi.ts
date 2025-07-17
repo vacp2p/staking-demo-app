@@ -1,36 +1,451 @@
 export const vaultAbi = [
-  {"type":"constructor","inputs":[{"name":"token","type":"address","internalType":"contract IERC20"}],"stateMutability":"nonpayable"},
-  {"type":"function","name":"STAKING_TOKEN","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IERC20"}],"stateMutability":"view"},
-  {"type":"function","name":"amountStaked","inputs":[],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
-  {"type":"function","name":"availableWithdraw","inputs":[{"name":"_token","type":"address","internalType":"contract IERC20"}],"outputs":[{"name":"","type":"uint256","internalType":"uint256"}],"stateMutability":"view"},
-  {"type":"function","name":"emergencyExit","inputs":[{"name":"_destination","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"initialize","inputs":[{"name":"_owner","type":"address","internalType":"address"},{"name":"_stakeManager","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"leave","inputs":[{"name":"_destination","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"lock","inputs":[{"name":"_seconds","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"migrateToVault","inputs":[{"name":"migrateTo","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"owner","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},
-  {"type":"function","name":"register","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"renounceOwnership","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"stake","inputs":[{"name":"_amount","type":"uint256","internalType":"uint256"},{"name":"_seconds","type":"uint256","internalType":"uint256"},{"name":"_from","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"stake","inputs":[{"name":"_amount","type":"uint256","internalType":"uint256"},{"name":"_seconds","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"stakeManager","inputs":[],"outputs":[{"name":"","type":"address","internalType":"contract IStakeManagerProxy"}],"stateMutability":"view"},
-  {"type":"function","name":"stakeManagerImplementationAddress","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},
-  {"type":"function","name":"transferOwnership","inputs":[{"name":"newOwner","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"trustStakeManager","inputs":[{"name":"stakeManagerAddress","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"unstake","inputs":[{"name":"_amount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"unstake","inputs":[{"name":"_amount","type":"uint256","internalType":"uint256"},{"name":"_destination","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"withdraw","inputs":[{"name":"_token","type":"address","internalType":"contract IERC20"},{"name":"_amount","type":"uint256","internalType":"uint256"},{"name":"_destination","type":"address","internalType":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"function","name":"withdraw","inputs":[{"name":"_token","type":"address","internalType":"contract IERC20"},{"name":"_amount","type":"uint256","internalType":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
-  {"type":"event","name":"Initialized","inputs":[{"name":"version","type":"uint8","indexed":false,"internalType":"uint8"}],"anonymous":false},
-  {"type":"event","name":"OwnershipTransferred","inputs":[{"name":"previousOwner","type":"address","indexed":true,"internalType":"address"},{"name":"newOwner","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},
-  {"type":"event","name":"VaultUpdated","inputs":[{"name":"vault","type":"address","indexed":true,"internalType":"address"},{"name":"amount","type":"uint256","indexed":false,"internalType":"uint256"},{"name":"timestamp","type":"uint256","indexed":false,"internalType":"uint256"}],"anonymous":false},
-  {"type":"event","name":"VaultLeft","inputs":[{"name":"vault","type":"address","indexed":true,"internalType":"address"}],"anonymous":false},
-  {"type":"error","name":"StakeVault__InvalidDestinationAddress","inputs":[]},
-  {"type":"error","name":"StakeVault__MigrationFailed","inputs":[]},
-  {"type":"error","name":"StakeVault__NotAllowedToExit","inputs":[]},
-  {"type":"error","name":"StakeVault__NotAllowedToLeave","inputs":[]},
-  {"type":"error","name":"StakeVault__NotEnoughAvailableBalance","inputs":[]},
-  {"type":"error","name":"StakeVault__StakeManagerImplementationNotTrusted","inputs":[]},
-  {"type":"error","name":"StakeVault__StakingFailed","inputs":[]},
-  {"type":"error","name":"StakeVault__UnstakingFailed","inputs":[]}
+	{
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__FundsLocked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__InvalidDestinationAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__MigrationFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__NotAllowedToExit",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__NotAllowedToLeave",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__NotEnoughAvailableBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__StakeManagerImplementationNotTrusted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__StakingFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__UnstakingFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "StakeVault__WithdrawFromVaultFailed",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "version",
+				"type": "uint8"
+			}
+		],
+		"name": "Initialized",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "STAKING_TOKEN",
+		"outputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "amountStaked",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "_token",
+				"type": "address"
+			}
+		],
+		"name": "availableWithdraw",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_destination",
+				"type": "address"
+			}
+		],
+		"name": "emergencyExit",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_owner",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_stakeManager",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_destination",
+				"type": "address"
+			}
+		],
+		"name": "leave",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_seconds",
+				"type": "uint256"
+			}
+		],
+		"name": "lock",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lockUntil",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "migrateTo",
+				"type": "address"
+			}
+		],
+		"name": "migrateToVault",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "register",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_seconds",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_from",
+				"type": "address"
+			}
+		],
+		"name": "stake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_seconds",
+				"type": "uint256"
+			}
+		],
+		"name": "stake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "stakeManager",
+		"outputs": [
+			{
+				"internalType": "contract IStakeManagerProxy",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "stakeManagerImplementationAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "stakeManagerAddress",
+				"type": "address"
+			}
+		],
+		"name": "trustStakeManager",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			}
+		],
+		"name": "unstake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_destination",
+				"type": "address"
+			}
+		],
+		"name": "unstake",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_lockUntil",
+				"type": "uint256"
+			}
+		],
+		"name": "updateLockUntil",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "_token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_destination",
+				"type": "address"
+			}
+		],
+		"name": "withdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "_token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			}
+		],
+		"name": "withdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_destination",
+				"type": "address"
+			}
+		],
+		"name": "withdrawFromVault",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
 ] as const; 
