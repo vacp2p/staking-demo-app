@@ -345,7 +345,13 @@
 			faucetCompleted = false;
 
 			// Calculate remaining amount to claim
-			const remainingAmount = dailyLimit - accountDailyRequests;
+			// If reset time has passed, user can claim full daily limit
+			// Otherwise, calculate remaining from current usage
+			const now = BigInt(Math.floor(Date.now() / 1000));
+			const remainingAmount = accountResetTime <= now 
+				? dailyLimit  // Reset time passed → claim full limit
+				: dailyLimit - accountDailyRequests;  // Normal case → remaining amount
+			
 			if (remainingAmount <= 0n) {
 				throw new Error('No tokens available to claim');
 			}
@@ -394,7 +400,7 @@
 								<div class="group relative">
 									<button 
 										class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-										disabled={isFaucetLoading || isFauceting || accountDailyRequests >= dailyLimit}
+										disabled={isFaucetLoading || isFauceting || (accountDailyRequests >= dailyLimit && accountResetTime > BigInt(Math.floor(Date.now() / 1000)))}
 										on:click={handleFaucetRequest}
 									>
 										{#if isFaucetLoading}
