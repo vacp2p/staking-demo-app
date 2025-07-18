@@ -198,13 +198,28 @@ async function fetchSntBalance(address: Address) {
 // Function to fetch account info for a single vault
 async function fetchVaultAccount(vaultAddress: Address) {
 	try {
-		const account = await publicClient.readContract({
-			address: STAKING_MANAGER.address,
-			abi: stakingManagerAbi,
-			functionName: 'getVault',
-			args: [vaultAddress]
-		});
-		return account;
+		// Get vault data from StakingManager (no longer includes lockUntil)
+		const [vaultData, lockUntil] = await Promise.all([
+			publicClient.readContract({
+				address: STAKING_MANAGER.address,
+				abi: stakingManagerAbi,
+				functionName: 'getVault',
+				args: [vaultAddress]
+			}),
+			// Get lockUntil directly from the vault contract
+			publicClient.readContract({
+				address: vaultAddress,
+				abi: vaultAbi,
+				functionName: 'lockUntil',
+				args: []
+			})
+		]);
+		
+		// Combine into expected Account shape
+		return {
+			...vaultData,
+			lockUntil
+		} as Account;
 	} catch (error) {
 		console.error(`Failed to fetch account info for vault ${vaultAddress}:`, error);
 		return null;
