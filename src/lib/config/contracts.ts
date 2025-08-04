@@ -5,6 +5,7 @@ import { vaultFactoryAbi } from '../contracts/vaultFactoryAbi';
 import { vaultAbi } from '../contracts/vaultAbi';
 import { tokenAbi } from '../contracts/tokenAbi';
 import { karmaAbi } from '../contracts/karmaAbi';
+import { karmaTiersAbi } from '../contracts/karmaTiersAbi';
 
 // Token information for Status Network Testnet
 export const SNT_TOKEN = {
@@ -38,4 +39,9 @@ export const KARMA_NFT = {
 
 export const VAULT = {
     abi: vaultAbi
+} as const;
+
+export const KARMA_TIERS = {
+    address: '0x011b9de308BE357BbF24EfB387a270a14A04E5d2' as Address,
+    abi: karmaTiersAbi
 } as const; 
