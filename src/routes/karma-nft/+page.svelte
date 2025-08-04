@@ -2,6 +2,7 @@
   import { walletAddress, publicClient } from '$lib/viem';
   import { onMount, onDestroy } from 'svelte';
   import { KARMA_NFT_ADDRESS, karmaNftAbi } from '$lib/contracts/karmaNftAbi';
+  import { KARMA_TIERS } from '$lib/config/contracts';
   import type { Address } from 'viem';
   import { formatUnits } from 'viem';
   
@@ -12,6 +13,14 @@
     image_data?: string;
     image?: string;
   };
+
+  // Tier data structure
+  type Tier = {
+    minKarma: bigint;
+    maxKarma: bigint;
+    name: string;
+    txPerEpoch: number;
+  };
   
   let isLoading = false;
   let error: string | null = null;
@@ -19,6 +28,11 @@
   let decodedSvg: string | null = null;
   let karmaBalance: string = '0';
   let imageDataUrl: string | null = null;
+  
+  // Tier data state
+  let tiers: Tier[] = [];
+  let isLoadingTiers = false;
+  let tierError: string | null = null;
   
   // Function to derive tokenID from wallet address
   function deriveTokenIdFromAddress(address: Address): bigint {
@@ -54,6 +68,69 @@
       });
   }
   
+  // Function to fetch tier data from contract
+  async function fetchTierData() {
+    if (!publicClient) return;
+    
+    isLoadingTiers = true;
+    tierError = null;
+    tiers = [];
+    
+    try {
+      console.log('Fetching tier count...');
+      
+      // First get the tier count
+      const tierCount = await publicClient.readContract({
+        address: KARMA_TIERS.address,
+        abi: KARMA_TIERS.abi,
+        functionName: 'getTierCount'
+      }) as bigint;
+      
+      console.log(`Found ${tierCount.toString()} tiers`);
+      
+      // Fetch each tier by ID
+      const tierPromises = [];
+      for (let i = 0; i < Number(tierCount); i++) {
+        tierPromises.push(
+          publicClient.readContract({
+            address: KARMA_TIERS.address,
+            abi: KARMA_TIERS.abi,
+            functionName: 'getTierById',
+            args: [i]
+          })
+        );
+      }
+      
+      // Wait for all tier data
+      const tierResults = await Promise.all(tierPromises);
+      
+      // Process and store tier data
+      tiers = tierResults.map((tierData: any, index) => {
+        const tier = {
+          minKarma: tierData.minKarma,
+          maxKarma: tierData.maxKarma,
+          name: tierData.name,
+          txPerEpoch: Number(tierData.txPerEpoch)
+        };
+        console.log(`Tier ${index}:`, {
+          name: tier.name,
+          minKarma: tier.minKarma.toString(),
+          maxKarma: tier.maxKarma.toString(),
+          txPerEpoch: tier.txPerEpoch
+        });
+        return tier;
+      });
+      
+      console.log('Fetched tiers:', tiers);
+      
+    } catch (err) {
+      console.error('Error fetching tier data:', err);
+      tierError = err instanceof Error ? err.message : 'Failed to fetch tier data';
+    } finally {
+      isLoadingTiers = false;
+    }
+  }
+
   // Function to fetch and decode NFT metadata
   async function fetchNftMetadata(address: Address) {
     if (!address) return;
@@ -151,14 +228,20 @@
   // Watch for wallet address changes
   $: if ($walletAddress) {
     fetchNftMetadata($walletAddress);
+    fetchTierData();
   }
+
+  // Fetch tier data on mount (doesn't require wallet connection)
+  onMount(() => {
+    fetchTierData();
+  });
 </script>
 
 <div class="mx-auto max-w-7xl px-6 lg:px-8">
   {#if $walletAddress}
     <div class="mx-auto mt-8 max-w-4xl">
       <div class="bg-white shadow-sm rounded-lg p-6 mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 mb-4">Your KarmaNFT</h1>
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Tier & NFT</h1>
         
         {#if isLoading}
           <div class="flex justify-center py-8">
@@ -172,7 +255,10 @@
             <p class="text-red-700">Error: {error}</p>
           </div>
           <button 
-            on:click={() => fetchNftMetadata($walletAddress)}
+            on:click={() => {
+              fetchNftMetadata($walletAddress);
+              fetchTierData();
+            }}
             class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Try Again
@@ -188,8 +274,114 @@
               </div>
             </div>
           </div>
+
+          <!-- Tier Information Section -->
+          <div class="bg-white shadow-sm rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Tier Status</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Current Tier Info (Left Block) -->
+              <div class="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-lg border border-purple-100">
+                <div class="flex flex-col">
+                  <h3 class="text-sm font-medium text-purple-700 mb-3">Current Tier</h3>
+                  <div class="mb-4">
+                    <span class="text-3xl font-bold text-purple-900">Apprentice</span>
+                    <div class="mt-2 text-sm text-purple-600">
+                      Tier 2 of 5
+                    </div>
+                  </div>
+                  <div class="mt-auto">
+                    <div class="text-sm text-purple-700 mb-2">Next Tier Progress</div>
+                    <div class="flex items-center justify-between text-sm mb-1">
+                      <span class="text-purple-600">Current: {parseFloat(karmaBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })} KARMA</span>
+                      <span class="text-purple-600">Need: 10,000 KARMA</span>
+                    </div>
+                    <div class="w-full bg-purple-200 rounded-full h-2">
+                      <div class="bg-purple-600 h-2 rounded-full" style="width: 45%"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-purple-600">
+                      You need <strong>5,500 more KARMA</strong> to reach <strong>Expert</strong> tier
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tier Composition (Right Block) -->
+              <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <div class="flex flex-col h-full">
+                  <h3 class="text-sm font-medium text-gray-700 mb-3">All Tiers</h3>
+                  
+                  {#if isLoadingTiers}
+                    <div class="flex justify-center py-8">
+                      <svg class="animate-spin h-6 w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  {:else if tierError}
+                    <div class="bg-red-50 p-3 rounded-lg">
+                      <p class="text-red-700 text-sm">Error loading tiers: {tierError}</p>
+                    </div>
+                  {:else if tiers.length > 0}
+                    <div class="space-y-3 flex-1">
+                      {#each tiers as tier, index}
+                        <!-- Dynamic tier colors based on index -->
+                        {@const tierColors = [
+                          { bg: 'bg-gray-400', highlight: 'bg-gray-100 border-gray-300 text-gray-900', text: 'text-gray-600' },
+                          { bg: 'bg-blue-400', highlight: 'bg-blue-100 border-blue-300 text-blue-900', text: 'text-blue-600' },
+                          { bg: 'bg-purple-400', highlight: 'bg-purple-100 border-purple-300 text-purple-900', text: 'text-purple-600' },
+                          { bg: 'bg-yellow-400', highlight: 'bg-yellow-100 border-yellow-300 text-yellow-900', text: 'text-yellow-600' },
+                          { bg: 'bg-orange-400', highlight: 'bg-orange-100 border-orange-300 text-orange-900', text: 'text-orange-600' },
+                          { bg: 'bg-red-400', highlight: 'bg-red-100 border-red-300 text-red-900', text: 'text-red-600' },
+                          { bg: 'bg-indigo-400', highlight: 'bg-indigo-100 border-indigo-300 text-indigo-900', text: 'text-indigo-600' }
+                        ]}
+                        {@const colorScheme = tierColors[index % tierColors.length]}
+                        
+                        <!-- Check if this is current user's tier (placeholder logic for now) -->
+                        {@const isCurrentTier = index === 1}
+                        
+                        <div class="flex flex-col p-3 rounded-lg border {isCurrentTier ? colorScheme.highlight + ' border-2' : 'bg-white border-gray-200'}">
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-3">
+                              <div class="w-3 h-3 rounded-full {colorScheme.bg}"></div>
+                              <span class="text-sm font-medium {isCurrentTier ? colorScheme.text : 'text-gray-600'}">{tier.name}</span>
+                              {#if isCurrentTier}
+                                <span class="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Current</span>
+                              {/if}
+                            </div>
+                            <span class="text-xs {isCurrentTier ? colorScheme.text + ' font-medium' : 'text-gray-500'}">
+                              {#if tier.maxKarma === 0n && tier.minKarma > 0n}
+                                {Number(tier.minKarma).toLocaleString()}+ KARMA
+                              {:else if tier.maxKarma >= 18446744073709551615n}
+                                {Number(tier.minKarma).toLocaleString()}+ KARMA  
+                              {:else if tier.minKarma === 0n && tier.maxKarma === 0n}
+                                All levels
+                              {:else}
+                                {Number(tier.minKarma).toLocaleString()} - {Number(tier.maxKarma).toLocaleString()} KARMA
+                              {/if}
+                            </span>
+                          </div>
+                          <div class="text-xs {isCurrentTier ? colorScheme.text : 'text-gray-400'}">
+                            {tier.txPerEpoch.toLocaleString()} transactions per epoch
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="flex justify-center py-8">
+                      <p class="text-gray-500 text-sm">No tiers found</p>
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NFT Section Header -->
+          <div class="bg-white shadow-sm rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Your KarmaNFT</h2>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- NFT Image (Left Side) -->
             <div class="bg-gray-50 p-4 rounded-lg flex items-center justify-center">
               {#if decodedSvg}
@@ -275,7 +467,10 @@
               
               <div class="mt-auto pt-4">
                 <button 
-                  on:click={() => fetchNftMetadata($walletAddress)}
+                  on:click={() => {
+                    fetchNftMetadata($walletAddress);
+                    fetchTierData();
+                  }}
                   class="w-full inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <svg class="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -285,6 +480,7 @@
                 </button>
               </div>
             </div>
+          </div>
           </div>
         {:else}
           <div class="bg-blue-50 p-4 rounded-lg">

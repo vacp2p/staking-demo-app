@@ -187,7 +187,7 @@
 						? 'rounded-lg bg-blue-100 text-blue-700'
 						: 'text-gray-600 hover:text-blue-600'}"
 				>
-					KarmaNFT
+					Tier & NFT
 				</a>
 			</div>
 
