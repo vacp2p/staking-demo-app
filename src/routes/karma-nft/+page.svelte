@@ -466,7 +466,15 @@
                               <div class="w-3 h-3 rounded-full {colorScheme.bg}"></div>
                               <span class="text-sm font-medium {isCurrentTier ? colorScheme.text : 'text-gray-600'}">{tier.name}</span>
                               {#if isCurrentTier}
-                                <span class="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">Current</span>
+                                {@const badgeColors = colorScheme.highlight.includes('gray') ? 'bg-gray-200 text-gray-800' :
+                                  colorScheme.highlight.includes('blue') ? 'bg-blue-200 text-blue-800' :
+                                  colorScheme.highlight.includes('purple') ? 'bg-purple-200 text-purple-800' :
+                                  colorScheme.highlight.includes('yellow') ? 'bg-yellow-200 text-yellow-800' :
+                                  colorScheme.highlight.includes('orange') ? 'bg-orange-200 text-orange-800' :
+                                  colorScheme.highlight.includes('red') ? 'bg-red-200 text-red-800' :
+                                  colorScheme.highlight.includes('indigo') ? 'bg-indigo-200 text-indigo-800' :
+                                  'bg-gray-200 text-gray-800'}
+                                <span class="text-xs {badgeColors} px-2 py-1 rounded-full">Current</span>
                               {/if}
                             </div>
                             <span class="text-xs {isCurrentTier ? colorScheme.text + ' font-medium' : 'text-gray-500'}">
