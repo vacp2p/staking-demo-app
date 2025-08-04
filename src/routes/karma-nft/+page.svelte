@@ -34,6 +34,12 @@
   let isLoadingTiers = false;
   let tierError: string | null = null;
   
+  // Current user tier calculation
+  $: currentKarmaNum = Math.floor(parseFloat(karmaBalance));
+  $: currentTier = calculateUserTier(currentKarmaNum, tiers);
+  $: nextTier = calculateNextTier(currentTier, tiers);
+  $: tierProgress = calculateTierProgress(currentKarmaNum, currentTier, nextTier);
+  
   // Function to derive tokenID from wallet address
   function deriveTokenIdFromAddress(address: Address): bigint {
     // Convert address to decimal (bigint)
@@ -67,6 +73,80 @@
         console.error('Failed to copy: ', err);
       });
   }
+
+  // Function to calculate user's current tier
+  function calculateUserTier(karmaAmount: number, tierList: Tier[]) {
+    if (!tierList.length || karmaAmount < 0) return null;
+    
+    for (let i = 0; i < tierList.length; i++) {
+      const tier = tierList[i];
+      const minKarma = Number(tier.minKarma);
+      const maxKarma = Number(tier.maxKarma);
+      
+      // Handle unlimited tier (maxKarma is 0 or very large)
+      if (maxKarma === 0 || maxKarma >= 18446744073709551615) {
+        if (karmaAmount >= minKarma) {
+          return { ...tier, index: i };
+        }
+      } else {
+        // Regular tier with range
+        if (karmaAmount >= minKarma && karmaAmount <= maxKarma) {
+          return { ...tier, index: i };
+        }
+      }
+    }
+    
+    return null; // No tier found
+  }
+
+  // Function to find the next tier
+  function calculateNextTier(currentTierData: any, tierList: Tier[]) {
+    if (!tierList.length || !currentTierData) {
+      // If no current tier, return the first tier
+      return tierList.length > 0 ? { ...tierList[0], index: 0 } : null;
+    }
+    
+    const nextIndex = currentTierData.index + 1;
+    if (nextIndex < tierList.length) {
+      return { ...tierList[nextIndex], index: nextIndex };
+    }
+    
+    return null; // Already at highest tier
+  }
+
+  // Function to calculate progress towards next tier
+  function calculateTierProgress(karmaAmount: number, currentTierData: any, nextTierData: any) {
+    if (!nextTierData) return { percentage: 100, needed: 0 };
+    
+    const nextTierMin = Number(nextTierData.minKarma);
+    const currentProgress = karmaAmount;
+    const needed = Math.max(0, nextTierMin - currentProgress);
+    
+    let percentage = 0;
+    if (currentTierData) {
+      const currentMin = Number(currentTierData.minKarma);
+      const range = nextTierMin - currentMin;
+      const progress = currentProgress - currentMin;
+      percentage = range > 0 ? Math.min(100, Math.max(0, (progress / range) * 100)) : 0;
+    } else {
+      // No current tier, progress from 0 to first tier
+      percentage = nextTierMin > 0 ? Math.min(100, (currentProgress / nextTierMin) * 100) : 0;
+    }
+    
+    return { percentage, needed };
+  }
+
+  // Witty messages for users with no tier
+  const noTierMessages = [
+    "No tier defines you! 🚀",
+    "You've escaped all tiers! 🌟", 
+    "Too unique for categories! ✨",
+    "Breaking the tier system! 🔥",
+    "Off the charts! 📈",
+    "Tier system.exe stopped working 🤖"
+  ];
+  
+  $: randomNoTierMessage = noTierMessages[Math.floor(Math.random() * noTierMessages.length)];
   
   // Function to fetch tier data from contract
   async function fetchTierData() {
@@ -281,28 +361,68 @@
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <!-- Current Tier Info (Left Block) -->
-              <div class="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-lg border border-purple-100">
-                <div class="flex flex-col">
-                  <h3 class="text-sm font-medium text-purple-700 mb-3">Current Tier</h3>
-                  <div class="mb-4">
-                    <span class="text-3xl font-bold text-purple-900">Apprentice</span>
-                    <div class="mt-2 text-sm text-purple-600">
-                      Tier 2 of 5
+              <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <div class="flex flex-col h-full">
+                  <h3 class="text-sm font-medium text-gray-700 mb-3">Current Tier</h3>
+                  
+                  {#if currentTier}
+                    <div class="mb-4">
+                      <span class="text-3xl font-bold text-gray-900">{currentTier.name}</span>
+                      <div class="mt-2 text-sm text-gray-600">
+                        Tier {currentTier.index + 1} of {tiers.length}
+                      </div>
+                      <div class="mt-1 text-xs text-gray-500">
+                        {currentTier.txPerEpoch.toLocaleString()} transactions per epoch
+                      </div>
                     </div>
-                  </div>
-                  <div class="mt-auto">
-                    <div class="text-sm text-purple-700 mb-2">Next Tier Progress</div>
-                    <div class="flex items-center justify-between text-sm mb-1">
-                      <span class="text-purple-600">Current: {parseFloat(karmaBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })} KARMA</span>
-                      <span class="text-purple-600">Need: 10,000 KARMA</span>
+                    
+                    {#if nextTier}
+                      <div class="mt-auto">
+                        <div class="text-sm text-gray-700 mb-2">Next Tier Progress</div>
+                        <div class="flex items-center justify-between text-sm mb-1">
+                          <span class="text-gray-600">Current: {currentKarmaNum.toLocaleString()} KARMA</span>
+                          <span class="text-gray-600">Need: {Number(nextTier.minKarma).toLocaleString()} KARMA</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div class="bg-gray-600 h-2 rounded-full transition-all duration-300" style="width: {tierProgress.percentage}%"></div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-600">
+                          You need <strong>{tierProgress.needed.toLocaleString()} more KARMA</strong> to reach <strong>{nextTier.name}</strong> tier
+                        </div>
+                      </div>
+                    {:else}
+                      <div class="mt-auto">
+                        <div class="text-sm text-gray-700 mb-2">Achievement Unlocked! 🏆</div>
+                        <div class="text-xs text-gray-600">
+                          You've reached the highest tier available! You're at the top of the karma ladder.
+                        </div>
+                      </div>
+                    {/if}
+                  {:else}
+                    <!-- No tier found -->
+                    <div class="mb-4">
+                      <span class="text-3xl font-bold text-gray-900">{randomNoTierMessage}</span>
+                      <div class="mt-2 text-sm text-gray-600">
+                        Karma maverick detected
+                      </div>
                     </div>
-                    <div class="w-full bg-purple-200 rounded-full h-2">
-                      <div class="bg-purple-600 h-2 rounded-full" style="width: 45%"></div>
-                    </div>
-                    <div class="mt-2 text-xs text-purple-600">
-                      You need <strong>5,500 more KARMA</strong> to reach <strong>Expert</strong> tier
-                    </div>
-                  </div>
+                    
+                    {#if nextTier}
+                      <div class="mt-auto opacity-60">
+                        <div class="text-sm text-gray-500 mb-2">Path to First Tier</div>
+                        <div class="flex items-center justify-between text-sm mb-1">
+                          <span class="text-gray-500">Current: {currentKarmaNum.toLocaleString()} KARMA</span>
+                          <span class="text-gray-500">Need: {Number(nextTier.minKarma).toLocaleString()} KARMA</span>
+                        </div>
+                        <div class="w-full bg-gray-300 rounded-full h-2">
+                          <div class="bg-gray-400 h-2 rounded-full transition-all duration-300" style="width: {tierProgress.percentage}%"></div>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-500">
+                          {tierProgress.needed.toLocaleString()} more KARMA to join <strong>{nextTier.name}</strong> tier
+                        </div>
+                      </div>
+                    {/if}
+                  {/if}
                 </div>
               </div>
 
@@ -337,8 +457,8 @@
                         ]}
                         {@const colorScheme = tierColors[index % tierColors.length]}
                         
-                        <!-- Check if this is current user's tier (placeholder logic for now) -->
-                        {@const isCurrentTier = index === 1}
+                        <!-- Check if this is current user's tier -->
+                        {@const isCurrentTier = currentTier && currentTier.index === index}
                         
                         <div class="flex flex-col p-3 rounded-lg border {isCurrentTier ? colorScheme.highlight + ' border-2' : 'bg-white border-gray-200'}">
                           <div class="flex items-center justify-between mb-2">
