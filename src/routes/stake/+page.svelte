@@ -259,7 +259,7 @@
 			lockHash = undefined;
 			lockCompleted = false;
 
-			const lockDurationSeconds = lockDurationDays * 24 * 60 * 60;
+			const lockDurationSeconds = Math.floor(lockDurationDays) * 24 * 60 * 60;
 
 			// Call the lock function on the vault
 			lockHash = await lockVault(selectedLockVaultId as Address, lockDurationSeconds);
@@ -703,7 +703,19 @@
 												<input
 													type="number"
 													id="durationDays"
-													bind:value={lockDurationDays}
+													value={lockDurationDays}
+													on:input={(e) => {
+														const days = Number(e.currentTarget.value);
+														if (!isNaN(days)) {
+															lockDurationDays = Math.max(MIN_LOCK_DAYS, Math.min(days, 1460));
+														}
+													}}
+													on:blur={(e) => {
+														const days = Number(e.currentTarget.value);
+														if (!isNaN(days)) {
+															lockDurationDays = Math.max(MIN_LOCK_DAYS, Math.min(days, 1460));
+														}
+													}}
 													min={MIN_LOCK_DAYS}
 													max="1460"
 													step="any"
