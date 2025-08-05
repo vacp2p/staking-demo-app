@@ -164,6 +164,19 @@
 		return `${minutes}m`;
 	}
 
+	function calculateVaultBoost(vault: Address): string {
+		const account = $vaultAccounts[vault];
+		if (!account || account.stakedBalance === 0n) return '1.00';
+		
+		// Convert to numbers for calculation
+		const vaultStaked = Number(formatUnits(account.stakedBalance, SNT_TOKEN.decimals));
+		const vaultMp = Number(formatUnits(account.mpAccrued || 0n, SNT_TOKEN.decimals));
+		
+		// Add 1 to reflect the boost (base multiplier is 1x)
+		const boost = (vaultMp / vaultStaked) + 1;
+		return boost.toFixed(2);
+	}
+
 	async function handleCompound(vault: Address) {
 		try {
 			// Set loading state
@@ -361,36 +374,38 @@
 					</div>
 				</div>
 			</div>
+		</div>
 
-			{#if $userVaults.length > 0}
-				<div class="mt-8 overflow-hidden">
-					<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
+		{#if $userVaults.length > 0}
+			<div class="mx-auto mt-8">
+				<h2 class="text-base font-semibold leading-7 text-gray-900">Your Staking Vaults</h2>
 
-					<!-- Table view (desktop) -->
-					<div class="mt-4 hidden sm:block">
-						<div class="overflow-x-auto rounded-xl bg-white shadow-sm">
-							<table class="w-full divide-y divide-gray-300">
-								<thead>
+				<!-- Table view (desktop) -->
+				<div class="mt-4 hidden sm:block">
+					<div class="overflow-x-auto rounded-xl bg-white shadow-sm">
+						<table class="w-full divide-y divide-gray-300">
+							<thead>
+								<tr>
+									<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[120px]">Vault ID</th>
+									<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Address</th>
+									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">SNT Staked</th>
+									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">
+										<div class="flex flex-col items-end">
+											<span>MPs</span>
+											<span class="text-xs font-normal text-gray-500">Ready to Compound</span>
+										</div>
+									</th>
+									<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Remaining Lock</th>
+									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[120px]">Boost</th>
+									<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">Karma Rewards</th>
+									<th class="w-[80px]"></th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200">
+								{#each $userVaults as vault, i}
 									<tr>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[120px]">Vault ID</th>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Address</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">SNT Staked</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">
-											<div class="flex flex-col items-end">
-												<span>Earned MPs</span>
-												<span class="text-xs font-normal text-gray-500">Ready to Compound</span>
-											</div>
-										</th>
-										<th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900 w-[150px]">Remaining Lock</th>
-										<th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900 w-[180px]">Karma Rewards</th>
-										<th class="w-[80px]"></th>
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-gray-200">
-									{#each $userVaults as vault, i}
-										<tr>
-											<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-												<div class="flex items-center gap-2">
+										<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+											<div class="flex items-center gap-2">
 													{#if isLocked(vault)}
 														<svg class="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 															<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -442,6 +457,9 @@
 												{:else}
 													{formatRemainingLock(vault)}
 												{/if}
+											</td>
+											<td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium text-gray-900">
+												{calculateVaultBoost(vault)}x
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm font-bold text-blue-900">
 												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'}
@@ -506,15 +524,15 @@
 											</td>
 										</tr>
 									{/each}
-								</tbody>
-							</table>
-						</div>
+							</tbody>
+						</table>
 					</div>
+				</div>
 
-					<!-- Card view (mobile) -->
-					<div class="mt-4 space-y-4 sm:hidden">
-						{#each $userVaults as vault, i}
-							<div class="overflow-hidden rounded-lg bg-white shadow">
+				<!-- Card view (mobile) -->
+				<div class="mt-4 space-y-4 sm:hidden">
+					{#each $userVaults as vault, i}
+						<div class="overflow-hidden rounded-lg bg-white shadow">
 								<div class="px-4 py-5">
 									<div class="flex items-center justify-between">
 										<div class="flex items-center gap-2">
@@ -574,6 +592,12 @@
 												{:else}
 													{formatRemainingLock(vault)}
 												{/if}
+											</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-sm text-gray-500">Boost</span>
+											<span class="text-sm font-medium text-gray-900">
+												{calculateVaultBoost(vault)}x
 											</span>
 										</div>
 										<div class="flex justify-between">
@@ -645,11 +669,10 @@
 									</div>
 								</div>
 							</div>
-						{/each}
-					</div>
+					{/each}
 				</div>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	{:else}
 		<div class="mx-auto mt-16 max-w-2xl text-center">
 			<div class="rounded-xl bg-white p-8 shadow-sm">
