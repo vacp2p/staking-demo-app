@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances, totalMpAccountBalance } from '$lib/viem';
 	import { SNT_TOKEN } from '$lib/config/contracts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -19,6 +19,20 @@
 
 	// Calculate the earliest unlock time across all vaults
 	$: firstUnlockTime = calculateFirstUnlockTime($userVaults, $vaultAccounts);
+
+	// Calculate aggregate multiplier (total MPs / total staked SNT/STT + 1 for base)
+	$: aggregateMultiplier = (() => {
+		const totalStakedRaw = Object.values($vaultAccounts).reduce((sum, account) => sum + account.stakedBalance, 0n);
+		if (totalStakedRaw === 0n) return '1.00';
+		
+		// Convert to numbers for calculation
+		const totalStaked = Number(formatUnits(totalStakedRaw, SNT_TOKEN.decimals));
+		const totalMp = Number(formatUnits($totalMpAccountBalance, SNT_TOKEN.decimals));
+		
+		// Add 1 to reflect the boost (base multiplier is 1x)
+		const multiplier = (totalMp / totalStaked) + 1;
+		return multiplier.toFixed(2);
+	})();
 
 	// Track compound transaction states
 	let compoundingVaults: Record<Address, 'idle' | 'loading' | 'success'> = {};
@@ -326,10 +340,10 @@
 
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Active Vaults</h3>
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Aggregate Multiplier</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{$userVaults.length}
+								{aggregateMultiplier}x
 							</span>
 						</div>
 					</div>
