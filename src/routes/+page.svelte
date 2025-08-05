@@ -20,18 +20,34 @@
 	// Calculate the earliest unlock time across all vaults
 	$: firstUnlockTime = calculateFirstUnlockTime($userVaults, $vaultAccounts);
 
-	// Calculate aggregate multiplier (total MPs / total staked SNT/STT + 1 for base)
-	$: aggregateMultiplier = (() => {
-		const totalStakedRaw = Object.values($vaultAccounts).reduce((sum, account) => sum + account.stakedBalance, 0n);
-		if (totalStakedRaw === 0n) return '1.00';
+	// Calculate weighted aggregate boost across all vaults
+	$: weightedAggregateBoost = (() => {
+		const vaultAddresses = Object.keys($vaultAccounts) as Address[];
+		if (vaultAddresses.length === 0) return '1.00';
 		
-		// Convert to numbers for calculation
-		const totalStaked = Number(formatUnits(totalStakedRaw, SNT_TOKEN.decimals));
-		const totalMp = Number(formatUnits($totalMpAccountBalance, SNT_TOKEN.decimals));
+		let totalWeightedBoost = 0;
+		let totalStaked = 0;
 		
-		// Add 1 to reflect the boost (base multiplier is 1x)
-		const multiplier = (totalMp / totalStaked) + 1;
-		return multiplier.toFixed(2);
+		for (const vault of vaultAddresses) {
+			const account = $vaultAccounts[vault];
+			if (!account || account.stakedBalance === 0n) continue;
+			
+			const vaultStaked = Number(formatUnits(account.stakedBalance, SNT_TOKEN.decimals));
+			const vaultMp = Number(formatUnits(account.mpAccrued || 0n, SNT_TOKEN.decimals));
+			
+			// Calculate vault boost (MPs/staked + 1)
+			const vaultBoost = (vaultMp / vaultStaked) + 1;
+			
+			// Weight the boost by the staked amount
+			totalWeightedBoost += vaultBoost * vaultStaked;
+			totalStaked += vaultStaked;
+		}
+		
+		if (totalStaked === 0) return '1.00';
+		
+		// Calculate weighted average
+		const weightedAverage = totalWeightedBoost / totalStaked;
+		return weightedAverage.toFixed(2);
 	})();
 
 	// Track compound transaction states
@@ -353,10 +369,10 @@
 
 				<div class="overflow-hidden rounded-xl bg-white p-6 shadow-sm">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-gray-500">Aggregate Multiplier</h3>
+						<h3 class="text-sm font-medium leading-6 text-gray-500">Weighted Aggregate Boost</h3>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-gray-900">
-								{aggregateMultiplier}x
+								{weightedAggregateBoost}x
 							</span>
 						</div>
 					</div>
