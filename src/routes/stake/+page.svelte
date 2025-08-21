@@ -400,7 +400,7 @@
 				<div class="p-6">
 					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 						<div class="flex-1">
-							<h2 class="text-base font-semibold leading-7 text-gray-900 mb-2">Testnet SNT Faucet</h2>
+							<h2 class="text-base font-semibold leading-7 text-gray-900 mb-2">Free Testnet SNT Faucet</h2>
 							<div class="text-sm space-y-1">
 								{#if isFaucetLoading}
 									<p class="text-gray-600">Loading faucet information...</p>
