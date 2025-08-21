@@ -9,6 +9,7 @@
 	import { page } from '$app/stores';
 	import { sepolia } from 'viem/chains';
 	import { openExplorer, openAddressExplorer } from '$lib/utils';
+	import { shouldBlockInteractions } from '$lib/stores/chainValidation';
 
 	// Faucet state
 	let dailyLimit: bigint = 0n;
@@ -445,7 +446,7 @@
 						<div class="flex flex-col items-start sm:items-end gap-2 sm:justify-center">
 							<button
 								class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-								disabled={isFaucetLoading || isFauceting || (accountDailyRequests >= dailyLimit && accountResetTime > BigInt(Math.floor(Date.now() / 1000)))}
+								disabled={$shouldBlockInteractions || isFaucetLoading || isFauceting || (accountDailyRequests >= dailyLimit && accountResetTime > BigInt(Math.floor(Date.now() / 1000)))}
 								on:click={handleFaucetRequest}
 							>
 								{#if isFaucetLoading}
@@ -520,7 +521,7 @@
 									<button
 										on:click={handleDeployVault}
 										class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-										disabled={isDeploying}
+										disabled={$shouldBlockInteractions || isDeploying}
 									>
 										{#if isDeploying}
 											<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -638,7 +639,8 @@
 							<div class="mt-6">
 								<button
 									type="submit"
-									class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+									class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+									disabled={$shouldBlockInteractions}
 								>
 									Stake SNT
 								</button>
@@ -796,7 +798,8 @@
 								<div class="mt-6">
 									<button
 										type="submit"
-										class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+										class="block w-full rounded-lg bg-blue-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+										disabled={$shouldBlockInteractions}
 									>
 										Lock Stake
 									</button>

@@ -8,6 +8,7 @@
 	import type { Address } from 'viem';
 	import { openAddressExplorer } from '$lib/utils';
 	import UnstakingModal from '$lib/components/UnstakingModal.svelte';
+	import { shouldBlockInteractions } from '$lib/stores/chainValidation';
 
 	let isUnstakingModalOpen = false;
 	let selectedVaultAddress: Address | undefined;
@@ -366,8 +367,8 @@
 												<button
 													class="hover:text-blue-600"
 													on:click={() => handleLockClick(vault)}
-													disabled={!$vaultAccounts[vault]?.stakedBalance ||
-														$vaultAccounts[vault].stakedBalance === 0n}
+																									disabled={$shouldBlockInteractions || !$vaultAccounts[vault]?.stakedBalance ||
+													$vaultAccounts[vault].stakedBalance === 0n}
 													class:opacity-50={!$vaultAccounts[vault]?.stakedBalance ||
 														$vaultAccounts[vault].stakedBalance === 0n}
 													class:cursor-not-allowed={!$vaultAccounts[vault]?.stakedBalance ||
@@ -602,8 +603,8 @@
 										<button
 											class="hover:text-blue-600"
 											on:click={() => handleLockClick(vault)}
-											disabled={!$vaultAccounts[vault]?.stakedBalance ||
-												$vaultAccounts[vault].stakedBalance === 0n}
+																							disabled={$shouldBlockInteractions || !$vaultAccounts[vault]?.stakedBalance ||
+													$vaultAccounts[vault].stakedBalance === 0n}
 											class:opacity-50={!$vaultAccounts[vault]?.stakedBalance ||
 												$vaultAccounts[vault].stakedBalance === 0n}
 											class:cursor-not-allowed={!$vaultAccounts[vault]?.stakedBalance ||
@@ -665,7 +666,7 @@
 										<button
 											on:click={() => handleCompound(vault)}
 											class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-50"
-											disabled={compoundingVaults[vault] === 'loading' || 
+											disabled={$shouldBlockInteractions || compoundingVaults[vault] === 'loading' || 
 												!$vaultMpBalances[vault] || 
 												$vaultMpBalances[vault] <= ($vaultAccounts[vault]?.mpAccrued || 0n)}
 											aria-label="Compound MPs"
@@ -750,7 +751,7 @@
 										<button
 											on:click={() => handleUnstake(vault, i + 1)}
 											class="rounded-lg bg-blue-50 px-2 py-1.5 text-sm font-semibold text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-50"
-											disabled={isLocked(vault) ||
+											disabled={$shouldBlockInteractions || isLocked(vault) ||
 												!$vaultAccounts[vault]?.stakedBalance ||
 												$vaultAccounts[vault].stakedBalance === 0n}
 										>
@@ -767,7 +768,7 @@
 										<button
 											on:click={() => handleCompound(vault)}
 											class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-50"
-											disabled={compoundingVaults[vault] === 'loading' || 
+											disabled={$shouldBlockInteractions || compoundingVaults[vault] === 'loading' || 
 												!$vaultMpBalances[vault] || 
 												$vaultMpBalances[vault] <= ($vaultAccounts[vault]?.mpAccrued || 0n)}
 											aria-label="Compound MPs"

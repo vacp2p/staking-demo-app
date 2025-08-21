@@ -23,7 +23,9 @@ const chains = [
     id: '0x' + statusNetworkTestnet.id.toString(16),
     token: 'ETH',
     label: 'Status Network Testnet',
-    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://public.sepolia.rpc.status.network'
+    rpcUrl: 'https://public.sepolia.rpc.status.network',
+    publicRpcUrl: 'https://public.sepolia.rpc.status.network',
+    blockExplorerUrl: 'https://sepoliascan.status.network'
   }
 ];
 
