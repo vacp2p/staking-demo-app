@@ -1,8 +1,7 @@
 import { createWalletClient, custom, type WalletClient, type Address } from 'viem';
-import { sepolia } from 'viem/chains';
 import { writable, type Writable, get } from 'svelte/store';
 import onboard from './onboard';
-import { walletAddress, walletClient, refreshBalances } from './viem';
+import { walletAddress, walletClient, refreshBalances, statusNetworkTestnet } from './viem';
 import type { WalletState } from '@web3-onboard/core';
 import { browser } from '$app/environment';
 import { walletPreferences } from './stores/wallet';
@@ -50,7 +49,7 @@ export async function initializeWallet() {
           
           // Create viem wallet client with the provider from Web3-Onboard
           const client = createWalletClient({
-            chain: sepolia,
+            chain: statusNetworkTestnet,
             transport: custom(connectedWallet.provider)
           });
           
@@ -96,7 +95,7 @@ function setupWalletSubscription(initialWallet: WalletState) {
       // Create new wallet client if provider changed
       if (newWallets[0].provider !== initialWallet.provider) {
         const newClient = createWalletClient({
-          chain: sepolia,
+          chain: statusNetworkTestnet,
           transport: custom(newWallets[0].provider)
         });
         walletClient.set(newClient);
@@ -127,7 +126,7 @@ export async function connectWithOnboard() {
         
         // Create viem wallet client with the provider from Web3-Onboard
         const client = createWalletClient({
-          chain: sepolia,
+          chain: statusNetworkTestnet,
           transport: custom(connectedWallet.provider)
         });
         

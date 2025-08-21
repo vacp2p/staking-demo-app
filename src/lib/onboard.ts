@@ -2,7 +2,7 @@ import init from '@web3-onboard/core';
 import injectedModule from '@web3-onboard/injected-wallets';
 import walletConnectModule from '@web3-onboard/walletconnect';
 import coinbaseModule from '@web3-onboard/coinbase';
-import { sepolia } from 'viem/chains';
+import { statusNetworkTestnet } from './viem';
 
 // Initialize wallet modules
 const injected = injectedModule({
@@ -20,10 +20,10 @@ const coinbase = coinbaseModule();
 // Define chains
 const chains = [
   {
-    id: '0x' + sepolia.id.toString(16),
+    id: '0x' + statusNetworkTestnet.id.toString(16),
     token: 'ETH',
-    label: 'Sepolia Testnet',
-    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.sepolia.org'
+    label: 'Status Network Testnet',
+    rpcUrl: import.meta.env.VITE_RPC_URL || 'https://public.sepolia.rpc.status.network'
   }
 ];
 
