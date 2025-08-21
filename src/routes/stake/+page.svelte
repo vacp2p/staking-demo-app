@@ -8,6 +8,7 @@
 	import LockingModal from '$lib/components/LockingModal.svelte';
 	import { page } from '$app/stores';
 	import { sepolia } from 'viem/chains';
+	import { openExplorer, openAddressExplorer } from '$lib/utils';
 
 	// Faucet state
 	let dailyLimit: bigint = 0n;
@@ -99,6 +100,11 @@
 		return formatNumberWithSpaces(num);
 	}
 
+	function formatAmountNoDecimals(amount: bigint): string {
+		const num = Number(formatUnits(amount, SNT_TOKEN.decimals));
+		return Math.floor(num).toLocaleString();
+	}
+
 	// Helper function to format numbers with spaces as thousand separators
 	function formatNumberWithSpaces(num: number): string {
 		// Format with 2 decimal places
@@ -110,7 +116,7 @@
 	}
 
 	function openAddressEtherscan(address: string) {
-		window.open(`https://sepolia.etherscan.io/address/${address}`, '_blank');
+		openAddressExplorer(address as Address);
 	}
 
 	// Dummy data for demonstration
@@ -389,58 +395,104 @@
 <div class="mx-auto max-w-2xl px-6 lg:px-8">
 	{#if $walletAddress}
 		<div class="mx-auto mt-8 space-y-6">
+			<!-- Testnet SNT Faucet Box -->
+			<div class="overflow-hidden rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 shadow-sm ring-1 ring-blue-200">
+				<div class="p-6">
+					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+						<div class="flex-1">
+							<h2 class="text-base font-semibold leading-7 text-gray-900 mb-2">Testnet SNT Faucet</h2>
+							<div class="text-sm space-y-1">
+								{#if isFaucetLoading}
+									<p class="text-gray-600">Loading faucet information...</p>
+								{:else if faucetError}
+									<p class="text-red-600">{faucetError}</p>
+								{:else}
+									{@const now = BigInt(Math.floor(Date.now() / 1000))}
+									{@const remainingAmount = accountResetTime <= now ? dailyLimit : dailyLimit - accountDailyRequests}
+									{@const hasUsedFaucet = accountDailyRequests > 0n}
+									{@const canClaim = remainingAmount > 0n}
+									
+									<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+										<div class="flex flex-col">
+											<span class="text-gray-500">Daily Limit</span>
+											<span class="font-medium text-gray-900">{formatAmountNoDecimals(dailyLimit)} SNT</span>
+										</div>
+										<div class="flex flex-col">
+											<span class="text-gray-500">Used Today</span>
+											<span class="font-medium text-gray-900">{formatAmountNoDecimals(accountDailyRequests)} SNT</span>
+										</div>
+										<div class="flex flex-col">
+											<span class="text-gray-500">
+												{#if !canClaim && hasUsedFaucet}
+													Next Available
+												{:else}
+													Available
+												{/if}
+											</span>
+											<span class="font-medium text-gray-900">
+												{#if !canClaim && hasUsedFaucet}
+													in {formatTimeRemaining(accountResetTime)}
+												{:else}
+													{formatAmountNoDecimals(remainingAmount)} SNT
+												{/if}
+											</span>
+										</div>
+									</div>
+								{/if}
+							</div>
+						</div>
+						
+						<div class="flex flex-col items-start sm:items-end gap-2 sm:justify-center">
+							<button
+								class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+								disabled={isFaucetLoading || isFauceting || (accountDailyRequests >= dailyLimit && accountResetTime > BigInt(Math.floor(Date.now() / 1000)))}
+								on:click={handleFaucetRequest}
+							>
+								{#if isFaucetLoading}
+									<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Loading...
+								{:else if isFauceting}
+									<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Claiming...
+								{:else if faucetCompleted}
+									<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+									</svg>
+									Claimed!
+								{:else}
+									<svg class="h-4 w-4 scale-x-[-1]" viewBox="0 0 463 463" fill="currentColor">
+										<path d="m447,341.234v-17.734c0-79.126-64.374-143.5-143.5-143.5h-113.734c-3.138-9.29-11.93-16-22.266-16-4.687,0-8.5-3.813-8.5-8.5v-8.5h0.5c4.142,0 7.5-3.358 7.5-7.5s-3.358-7.5-7.5-7.5h-16.5v-27.077l47.496,9.543c1.786,0.357 3.582,0.533 5.365,0.533 6.219,0 12.28-2.137 17.192-6.165 6.321-5.182 9.947-12.842 9.947-21.016s-3.625-15.833-9.946-21.016c-6.322-5.183-14.544-7.236-22.558-5.632l-50.889,10.177c-4.123-6.796-11.593-11.347-20.107-11.347s-15.984,4.551-20.107,11.348l-50.889-10.178c-8.013-1.602-16.237,0.45-22.558,5.632-6.321,5.182-9.946,12.842-9.946,21.016s3.625,15.834 9.947,21.016c4.913,4.028 10.975,6.166 17.192,6.166 1.781,0 3.575-0.176 5.357-0.532l47.504-9.443v26.975h-16.5c-4.142,0-7.5,3.358-7.5,7.5s3.358,7.5 7.5,7.5h0.5v8.5c0,4.687-3.813,8.5-8.5,8.5-10.336,0-19.128,6.71-22.266,16h-25.734c-12.958,0-23.5,10.542-23.5,23.5v64c0,12.958 10.542,23.5 23.5,23.5h25.734c3.138,9.29 11.93,16 22.266,16h96c10.336,0 19.128-6.71 22.266-16h113.734c17.92,0 32.5,14.58 32.5,32.5v17.734c-9.29,3.138-16,11.93-16,22.266v16c0,12.958 10.542,23.5 23.5,23.5h96c12.958,0 23.5-10.542 23.5-23.5v-16c0-10.336-6.71-19.128-16-22.266zm-253.563-265.355c3.589-0.719 7.274,0.201 10.107,2.523 2.832,2.322 4.456,5.753 4.456,9.416s-1.625,7.094-4.457,9.416c-2.832,2.322-6.516,3.242-10.1,2.524l-50.443-10.135v-3.657l50.437-10.087zm-73.937-.879c4.687,0 8.5,3.813 8.5,8.5v16.5h-17v-16.5c0-4.687 3.813-8.5 8.5-8.5zm-73.937,24.757c-3.592,0.719-7.275-0.202-10.106-2.523-2.832-2.322-4.457-5.754-4.457-9.416s1.624-7.094 4.456-9.416c2.832-2.322 6.515-3.243 10.107-2.523l50.437,10.088v3.765l-50.437,10.025zm65.437,15.243h17v17h-17v-17zm-96,152.5v-64c0-4.687 3.813-8.5 8.5-8.5h24.5v81h-24.5c-4.687,0-8.5-3.813-8.5-8.5zm161,16c0,4.687-3.813,8.5-8.5,8.5h-96c-4.68,0-8.488-3.803-8.499-8.481 0-0.007 0.001-0.013 0.001-0.019 0-0.013-0.002-0.026-0.002-0.039v-95.923c0-0.013 0.002-0.026 0.002-0.039 0-0.007-0.001-0.013-0.001-0.019 0.011-4.677 3.819-8.48 8.499-8.48 12.958,0 23.5-10.542 23.5-23.5v-8.5h49v8.5c0,12.958 10.542,23.5 23.5,23.5 4.687,0 8.5,3.813 8.5,8.5v96zm127.5-7.5h-112.5v-81h112.5c70.855,0 128.5,57.645 128.5,128.5v16.5h-81v-16.5c0-26.191-21.309-47.5-47.5-47.5zm144.5,103.5c0,4.687-3.813,8.5-8.5,8.5h-96c-4.687,0-8.5-3.813-8.5-8.5v-16c0-4.687 3.813-8.5 8.5-8.5h96c4.687,0 8.5,3.813 8.5,8.5v16z" />
+									</svg>
+									Claim Testnet SNT
+								{/if}
+							</button>
+							
+							{#if faucetHash && !faucetCompleted}
+								<button
+									class="text-xs text-blue-600 hover:text-blue-700"
+									on:click={() => faucetHash && openExplorer(faucetHash)}
+								>
+									View Transaction
+								</button>
+							{/if}
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<!-- Combined Balance and Deploy Box -->
 			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
 				<!-- SNT Balance Box -->
 				<div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-900/5">
 					<div class="p-8">
 						<div class="flex flex-col">
-							<div class="flex items-center justify-between">
-								<h2 class="text-base font-semibold leading-7 text-gray-900">Available SNT to Stake</h2>
-								<div class="group relative">
-									<button 
-										class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-										disabled={isFaucetLoading || isFauceting || (accountDailyRequests >= dailyLimit && accountResetTime > BigInt(Math.floor(Date.now() / 1000)))}
-										on:click={handleFaucetRequest}
-									>
-										{#if isFaucetLoading}
-											<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-											</svg>
-										{:else if isFauceting}
-											<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-											</svg>
-										{:else if faucetCompleted}
-											<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-											</svg>
-										{:else}
-											<svg class="h-6 w-6 scale-x-[-1]" viewBox="0 0 463 463" fill="currentColor">
-												<path d="m447,341.234v-17.734c0-79.126-64.374-143.5-143.5-143.5h-113.734c-3.138-9.29-11.93-16-22.266-16-4.687,0-8.5-3.813-8.5-8.5v-8.5h0.5c4.142,0 7.5-3.358 7.5-7.5s-3.358-7.5-7.5-7.5h-16.5v-27.077l47.496,9.543c1.786,0.357 3.582,0.533 5.365,0.533 6.219,0 12.28-2.137 17.192-6.165 6.321-5.182 9.947-12.842 9.947-21.016s-3.625-15.833-9.946-21.016c-6.322-5.183-14.544-7.236-22.558-5.632l-50.889,10.177c-4.123-6.796-11.593-11.347-20.107-11.347s-15.984,4.551-20.107,11.348l-50.889-10.178c-8.013-1.602-16.237,0.45-22.558,5.632-6.321,5.182-9.946,12.842-9.946,21.016s3.625,15.834 9.947,21.016c4.913,4.028 10.975,6.166 17.192,6.166 1.781,0 3.575-0.176 5.357-0.532l47.504-9.443v26.975h-16.5c-4.142,0-7.5,3.358-7.5,7.5s3.358,7.5 7.5,7.5h0.5v8.5c0,4.687-3.813,8.5-8.5,8.5-10.336,0-19.128,6.71-22.266,16h-25.734c-12.958,0-23.5,10.542-23.5,23.5v64c0,12.958 10.542,23.5 23.5,23.5h25.734c3.138,9.29 11.93,16 22.266,16h96c10.336,0 19.128-6.71 22.266-16h113.734c17.92,0 32.5,14.58 32.5,32.5v17.734c-9.29,3.138-16,11.93-16,22.266v16c0,12.958 10.542,23.5 23.5,23.5h96c12.958,0 23.5-10.542 23.5-23.5v-16c0-10.336-6.71-19.128-16-22.266zm-253.563-265.355c3.589-0.719 7.274,0.201 10.107,2.523 2.832,2.322 4.456,5.753 4.456,9.416s-1.625,7.094-4.457,9.416c-2.832,2.322-6.516,3.242-10.1,2.524l-50.443-10.135v-3.657l50.437-10.087zm-73.937-.879c4.687,0 8.5,3.813 8.5,8.5v16.5h-17v-16.5c0-4.687 3.813-8.5 8.5-8.5zm-73.937,24.757c-3.592,0.719-7.275-0.202-10.106-2.523-2.832-2.322-4.457-5.754-4.457-9.416s1.624-7.094 4.456-9.416c2.832-2.322 6.515-3.243 10.107-2.523l50.437,10.088v3.765l-50.437,10.025zm65.437,15.243h17v17h-17v-17zm-96,152.5v-64c0-4.687 3.813-8.5 8.5-8.5h24.5v81h-24.5c-4.687,0-8.5-3.813-8.5-8.5zm161,16c0,4.687-3.813,8.5-8.5,8.5h-96c-4.68,0-8.488-3.803-8.499-8.481 0-0.007 0.001-0.013 0.001-0.019 0-0.013-0.002-0.026-0.002-0.039v-95.923c0-0.013 0.002-0.026 0.002-0.039 0-0.007-0.001-0.013-0.001-0.019 0.011-4.677 3.819-8.48 8.499-8.48 12.958,0 23.5-10.542 23.5-23.5v-8.5h49v8.5c0,12.958 10.542,23.5 23.5,23.5 4.687,0 8.5,3.813 8.5,8.5v96zm127.5-7.5h-112.5v-81h112.5c70.855,0 128.5,57.645 128.5,128.5v16.5h-81v-16.5c0-26.191-21.309-47.5-47.5-47.5zm144.5,103.5c0,4.687-3.813,8.5-8.5,8.5h-96c-4.687,0-8.5-3.813-8.5-8.5v-16c0-4.687 3.813-8.5 8.5-8.5h96c4.687,0 8.5,3.813 8.5,8.5v16z" />
-											</svg>
-										{/if}
-									</button>
-									<div class="absolute bottom-full right-0 mb-2 hidden group-hover:block">
-										<div class="rounded bg-gray-900 px-2 py-1 text-xs text-white whitespace-nowrap">
-											{#if isFaucetLoading}
-												Loading...
-											{:else if isFauceting}
-												Requesting tokens...
-											{:else if faucetCompleted}
-												Tokens claimed!
-											{:else if accountDailyRequests >= dailyLimit}
-												Come back in {formatTimeRemaining(accountResetTime)}
-											{:else}
-												Get Test SNT
-											{/if}
-										</div>
-										<div class="absolute -bottom-1 right-4 h-2 w-2 rotate-45 bg-gray-900"></div>
-									</div>
-								</div>
-							</div>
+							<h2 class="text-base font-semibold leading-7 text-gray-900">Available SNT to Stake</h2>
 							<div class="mt-4 flex items-baseline gap-x-2">
 								<span class="text-4xl font-bold tracking-tight text-gray-900">
 									{$formattedSntBalance ?? '0'}
