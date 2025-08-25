@@ -198,7 +198,7 @@
       const tierResults = await Promise.all(tierPromises);
       
       // Process and store tier data
-      tiers = tierResults.map((tierData: any, index) => {
+      tiers = tierResults.map((tierData: any, index: number) => {
         const tier = {
           minKarma: tierData.minKarma,
           maxKarma: tierData.maxKarma,
