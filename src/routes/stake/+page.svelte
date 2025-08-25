@@ -410,7 +410,8 @@
 								{:else}
 									{@const now = BigInt(Math.floor(Date.now() / 1000))}
 									{@const remainingAmount = accountResetTime <= now ? dailyLimit : dailyLimit - accountDailyRequests}
-									{@const hasUsedFaucet = accountDailyRequests > 0n}
+									{@const actualUsedToday = accountResetTime <= now ? 0n : accountDailyRequests}
+									{@const hasUsedFaucet = actualUsedToday > 0n}
 									{@const canClaim = remainingAmount > 0n}
 									
 									<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -420,7 +421,7 @@
 										</div>
 										<div class="flex flex-col">
 											<span class="text-gray-500">Used Today</span>
-											<span class="font-medium text-gray-900">{formatAmountNoDecimals(accountDailyRequests)} SNT</span>
+											<span class="font-medium text-gray-900">{formatAmountNoDecimals(actualUsedToday)} SNT</span>
 										</div>
 										<div class="flex flex-col">
 											<span class="text-gray-500">
