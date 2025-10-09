@@ -1068,3 +1068,39 @@ export async function compoundAllVaults() {
 		throw error;
 	}
 }
+
+// Function to redeem rewards for an account
+export async function redeemRewards() {
+	try {
+		const client = get(walletClient);
+		const address = get(walletAddress);
+		const chain = get(currentChain);
+		
+		if (!client || !address) {
+			throw new Error('Wallet not connected');
+		}
+		
+		console.log(`Redeeming rewards for account: ${address} on chain: ${chain.name} (${chain.id})`);
+		
+		// Call redeemRewards on the staking manager with the account address as an argument
+		const hash = await client.writeContract({
+			chain: statusNetworkTestnet, // Use Status Network Testnet explicitly
+			account: address,
+			address: STAKING_MANAGER.address,
+			abi: stakingManagerAbi,
+			functionName: 'redeemRewards',
+			args: [address]
+		});
+		
+		console.log('Redeem rewards transaction hash:', hash);
+		
+		// Wait for transaction to be mined
+		const receipt = await publicClient.waitForTransactionReceipt({ hash });
+		console.log('Redeem rewards receipt:', receipt);
+		
+		return { hash, receipt };
+	} catch (error) {
+		console.error(`Failed to redeem rewards for account ${address}:`, error);
+		throw error;
+	}
+}
