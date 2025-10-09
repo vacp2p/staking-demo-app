@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances, totalMpAccountBalance, formatKarmaAmount } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, formattedTotalKarmaBalance, formattedKarmaErc20Balance, totalRewardsBalance, karmaErc20Balance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances, totalMpAccountBalance, formatKarmaAmount } from '$lib/viem';
 	import { SNT_TOKEN } from '$lib/config/contracts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -55,6 +55,9 @@
 	
 	// Track compound all transaction state
 	let compoundingAll: 'idle' | 'loading' | 'success' = 'idle';
+	
+	// Track karma breakdown visibility
+	let showKarmaBreakdown = false;
 	
 	// Initialize compounding state for all vaults
 	$: {
@@ -379,13 +382,38 @@
 				
 				<div class="overflow-hidden rounded-xl bg-blue-50 p-6 shadow-sm">
 					<div class="flex flex-col">
-						<h3 class="text-sm font-medium leading-6 text-blue-700">Your Karma Rewards</h3>
+						<div class="flex items-center justify-between">
+							<h3 class="text-sm font-medium leading-6 text-blue-700">Your Karma Rewards</h3>
+							<button
+								on:click={() => showKarmaBreakdown = !showKarmaBreakdown}
+								class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+								aria-label="Toggle karma breakdown"
+								title="Show karma breakdown"
+							>
+								<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18" />
+								</svg>
+							</button>
+						</div>
 						<div class="mt-4 flex items-baseline justify-end gap-x-2">
 							<span class="text-4xl font-bold tracking-tight text-blue-900">
-								{$formattedTotalRewardsBalance}
+								{$formattedTotalKarmaBalance}
 							</span>
 							<span class="text-sm font-semibold leading-6 text-blue-700">KARMA</span>
 						</div>
+						
+						{#if showKarmaBreakdown}
+							<div class="mt-4 space-y-2 border-t border-blue-200 pt-3">
+								<div class="flex justify-between text-xs">
+									<span class="text-blue-600">StakeManager Balance:</span>
+									<span class="font-medium text-blue-800">{$formattedTotalRewardsBalance}</span>
+								</div>
+								<div class="flex justify-between text-xs">
+									<span class="text-blue-600">ERC20 Balance:</span>
+									<span class="font-medium text-blue-800">{$formattedKarmaErc20Balance}</span>
+								</div>
+							</div>
+						{/if}
 					</div>
 				</div>
 			</div>

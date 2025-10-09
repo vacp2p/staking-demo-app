@@ -93,6 +93,7 @@ export const userVaults = writable<Address[]>([]);
 export const vaultAccounts = writable<Record<Address, Account>>({});
 export const rewardsBalance = writable<Record<Address, bigint>>({});
 export const totalRewardsBalance = writable<bigint>(0n);
+export const karmaErc20Balance = writable<bigint>(0n);
 export const totalMpAccountBalance = writable<bigint>(0n);
 export const vaultMpBalances = writable<Record<Address, bigint>>({});
 export const uncompoundedMpTotal = writable<bigint>(0n);
@@ -142,6 +143,35 @@ export const formattedUncompoundedMpTotal = derived(uncompoundedMpTotal, ($total
 });
 
 export const formattedTotalRewardsBalance = derived(totalRewardsBalance, ($total) => {
+	if ($total === undefined) return '0.00';
+	const num = Number(formatUnits($total, 18));
+	return formatNumberWithSpaces(num);
+});
+
+// Claimed ERC20 balance (ERC20 balance minus unclaimed StakeManager balance)
+export const claimedKarmaBalance = derived(
+	[karmaErc20Balance, totalRewardsBalance],
+	([$erc20Balance, $smBalance]) => {
+		const claimed = $erc20Balance - $smBalance;
+		return claimed > 0n ? claimed : 0n;
+	}
+);
+
+export const formattedKarmaErc20Balance = derived(claimedKarmaBalance, ($balance) => {
+	if ($balance === undefined) return '0.00';
+	const num = Number(formatUnits($balance, 18));
+	return formatNumberWithSpaces(num);
+});
+
+// Combined karma balance (StakeManager + Claimed ERC20)
+export const totalKarmaBalance = derived(
+	[totalRewardsBalance, claimedKarmaBalance],
+	([$smBalance, $claimedBalance]) => {
+		return $smBalance + $claimedBalance;
+	}
+);
+
+export const formattedTotalKarmaBalance = derived(totalKarmaBalance, ($total) => {
 	if ($total === undefined) return '0.00';
 	const num = Number(formatUnits($total, 18));
 	return formatNumberWithSpaces(num);
@@ -337,6 +367,7 @@ export async function refreshBalances(address: Address) {
 			fetchSntBalance(address),
 			fetchTotalStaked(),
 			fetchTotalRewardsBalance(address),
+			fetchKarmaErc20Balance(address),
 			fetchAllVaultRewardsBalances(vaults),
 			mpBalanceOfAccount(address),
 			fetchAllVaultMpBalances(vaults)
@@ -348,8 +379,9 @@ export async function refreshBalances(address: Address) {
 							  index === 1 ? 'STT balance' : 
 							  index === 2 ? 'Total staked' : 
 							  index === 3 ? 'Total rewards' :
-							  index === 4 ? 'Vault rewards' :
-							  index === 5 ? 'Total MP balance' :
+							  index === 4 ? 'ERC20 karma balance' :
+							  index === 5 ? 'Vault rewards' :
+							  index === 6 ? 'Total MP balance' :
 							  'Vault MP balances';
 							  
 			if (result.status === 'fulfilled') {
@@ -886,6 +918,36 @@ export async function fetchTotalRewardsBalance(address: Address) {
 			publicClient: publicClient ? 'Initialized' : 'Not initialized'
 		});
 		totalRewardsBalance.set(0n);
+		return 0n;
+	}
+}
+
+// Function to fetch ERC20 karma balance for a user
+export async function fetchKarmaErc20Balance(address: Address) {
+	const karmaAddress = KARMA.address;
+	
+	try {
+		console.log(`Fetching ERC20 karma balance for user: ${address}`);
+		console.log(`Using Karma contract address: ${karmaAddress}`);
+		
+		const balance = await publicClient.readContract({
+			address: karmaAddress,
+			abi: KARMA.abi,
+			functionName: 'balanceOf',
+			args: [address]
+		}) as bigint;
+		
+		console.log(`Received ERC20 karma balance for user ${address}: ${balance.toString()}`);
+		karmaErc20Balance.set(balance);
+		return balance;
+	} catch (error) {
+		console.error(`Failed to fetch ERC20 karma balance for user ${address}:`, error);
+		console.error('Error details:', {
+			chain: get(currentChain),
+			karmaAddress,
+			publicClient: publicClient ? 'Initialized' : 'Not initialized'
+		});
+		karmaErc20Balance.set(0n);
 		return 0n;
 	}
 }
