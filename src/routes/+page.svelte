@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances, totalMpAccountBalance } from '$lib/viem';
+	import { walletAddress, formattedBalance, formattedSntBalance, network, sntError, userVaults, formattedGlobalTotalStaked, fetchTotalStaked, fetchTokenPrice, tokenPriceUsd, globalTotalStaked, vaultAccounts, formattedTotalMpBalance, formattedStakedMpBalance, formattedTotalRewardsBalance, totalRewardsBalance, rewardsBalance, compoundMPs, compoundAllVaults, vaultMpBalances, formattedUncompoundedMpTotal, refreshBalances, totalMpAccountBalance, formatKarmaAmount } from '$lib/viem';
 	import { SNT_TOKEN } from '$lib/config/contracts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -129,8 +129,7 @@
 	}
 
 	function formatRewardsAmount(amount: bigint): string {
-		const num = Number(formatUnits(amount, 18));
-		return formatNumberWithSpaces(num);
+		return formatKarmaAmount(amount);
 	}
 
 	// Helper function to format numbers with spaces as thousand separators
@@ -479,6 +478,9 @@
 											</td>
 											<td class="whitespace-nowrap px-6 py-4 text-right text-sm font-bold text-blue-900">
 												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'}
+												{#if $rewardsBalance[vault] && $rewardsBalance[vault] >= BigInt('10000000000000000')}
+													<span class="text-xs font-normal text-gray-500 ml-1">KARMA</span>
+												{/if}
 											</td>
 											<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 												<div class="flex items-center justify-end gap-2">
@@ -620,6 +622,9 @@
 											<span class="text-sm text-gray-500">Karma Rewards</span>
 											<span class="text-sm font-bold text-blue-900">
 												{$rewardsBalance[vault] ? formatRewardsAmount($rewardsBalance[vault]) : '0.00'}
+												{#if $rewardsBalance[vault] && $rewardsBalance[vault] >= BigInt('10000000000000000')}
+													<span class="text-xs font-normal text-gray-500 ml-1">KARMA</span>
+												{/if}
 											</span>
 										</div>
 									</div>
@@ -660,7 +665,8 @@
 														</svg>
 													{:else if compoundingVaults[vault] === 'success'}
 														<!-- Success checkmark -->
-														<svg class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+														<svnpm run dev
+														g class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 															<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
 														</svg>
 													{:else}

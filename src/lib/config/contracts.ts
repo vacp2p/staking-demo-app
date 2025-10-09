@@ -18,22 +18,22 @@ export const SNT_TOKEN = {
 
 // Contract addresses for Status Network Testnet
 export const STAKING_MANAGER = {
-    address: '0xa5a82CCfE29d7f384E9A072991a1F6182C28e575' as Address,
+    address: '0x5cDf1646E4c1D21eE94DED1DA8da3Ca450dc96D1' as Address,
     abi: stakingManagerAbi
 } as const;
 
 export const VAULT_FACTORY = {
-    address: '0xE76da33596ABDE024C4905b0592FF12203baEcDC' as Address,
+    address: '0xddDcd43a0B0dA865decf3e4Ae71FbBE3e2DfFF14' as Address,
     abi: vaultFactoryAbi
 } as const;
 
 export const KARMA = {
-    address: '0x9ADD5A2F68d0d95F74C751a2081EFF57Ff1C836F' as Address,
+    address: '0x7ec5Dc75D09fAbcD55e76077AFa5d4b77D112fde' as Address,
     abi: karmaAbi // Using the new karma ABI since it's no longer a simple ERC20 token
 } as const;
 
 export const KARMA_NFT = {
-    address: '0xF47E1B12c60e9e356950ffA5680863ec2418bdCB' as Address,
+    address: '0xf78d58742840C0ee00b17EE062855392d10a0305' as Address,
     abi: karmaNftAbi
 } as const;
 

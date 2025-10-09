@@ -638,6 +638,36 @@ function formatNumberWithSpaces(num: number): string {
 	return parts.join('.');
 }
 
+// Helper function to format karma rewards with appropriate units
+export function formatKarmaAmount(amount: bigint): string {
+	// Convert to string to avoid precision loss for very small numbers
+	const amountStr = amount.toString();
+	
+	// If amount is 0, return 0.00
+	if (amount === 0n) {
+		return '0.00';
+	}
+	
+	// Define thresholds in wei
+	const oneKarma = BigInt('1000000000000000000'); // 1e18 wei = 1 KARMA
+	const oneGwei = BigInt('1000000000'); // 1e9 wei = 1 gwei
+	
+	// If amount is >= 0.01 KARMA (1e16 wei), show in KARMA with decimals
+	if (amount >= oneKarma / 100n) {
+		const num = Number(formatUnits(amount, 18));
+		return formatNumberWithSpaces(num);
+	}
+	// If amount is >= 1 gwei, show in gwei
+	else if (amount >= oneGwei) {
+		const gweiAmount = Number(formatUnits(amount, 9));
+		return `${Math.floor(gweiAmount)} gwei`;
+	}
+	// Otherwise show in wei
+	else {
+		return `${amountStr} wei`;
+	}
+}
+
 // Initial fetch of total staked
 fetchTotalStaked();
 
