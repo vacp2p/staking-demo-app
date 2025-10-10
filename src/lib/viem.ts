@@ -148,26 +148,18 @@ export const formattedTotalRewardsBalance = derived(totalRewardsBalance, ($total
 	return formatNumberWithSpaces(num);
 });
 
-// Claimed ERC20 balance (ERC20 balance minus unclaimed StakeManager balance)
-export const claimedKarmaBalance = derived(
-	[karmaErc20Balance, totalRewardsBalance],
-	([$erc20Balance, $smBalance]) => {
-		const claimed = $erc20Balance - $smBalance;
-		return claimed > 0n ? claimed : 0n;
-	}
-);
-
-export const formattedKarmaErc20Balance = derived(claimedKarmaBalance, ($balance) => {
+// ERC20 balance (now using actualTokenBalanceOf which already excludes SM balance)
+export const formattedKarmaErc20Balance = derived(karmaErc20Balance, ($balance) => {
 	if ($balance === undefined) return '0.00';
 	const num = Number(formatUnits($balance, 18));
 	return formatNumberWithSpaces(num);
 });
 
-// Combined karma balance (StakeManager + Claimed ERC20)
+// Combined karma balance (StakeManager + ERC20)
 export const totalKarmaBalance = derived(
-	[totalRewardsBalance, claimedKarmaBalance],
-	([$smBalance, $claimedBalance]) => {
-		return $smBalance + $claimedBalance;
+	[totalRewardsBalance, karmaErc20Balance],
+	([$smBalance, $erc20Balance]) => {
+		return $smBalance + $erc20Balance;
 	}
 );
 
@@ -933,11 +925,11 @@ export async function fetchKarmaErc20Balance(address: Address) {
 		const balance = await publicClient.readContract({
 			address: karmaAddress,
 			abi: KARMA.abi,
-			functionName: 'balanceOf',
+			functionName: 'actualTokenBalanceOf',
 			args: [address]
 		}) as bigint;
 		
-		console.log(`Received ERC20 karma balance for user ${address}: ${balance.toString()}`);
+		console.log(`Received actual ERC20 karma balance for user ${address}: ${balance.toString()}`);
 		karmaErc20Balance.set(balance);
 		return balance;
 	} catch (error) {
